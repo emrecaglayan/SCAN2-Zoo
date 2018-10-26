@@ -13,10 +13,48 @@ reconstitute the findings reported in the manuscript.
 In each step, the dependency versions refer to the **tested** versions.
 Other versions may work as well.
 
-## STEP 0. Download demo BAM files
-At least one single cell and the unamplified bulk must be used. We recommend
-downloading hunamp and il-12. The two other kindred system samples are also
-provided. Both the BAM and index file must be downloaded.
+## STEP 0. Installation and demo data
+**Dependencies**: LAPACKE (v3.6.1), OpenBLAS (v0.2.19)\
+**Optional dependencies**: Intel C compiler
+
+1. Build and install the SCAN-SNV R package
+```
+$ cd /root/of/git/repo
+$ R CMD build rpkg
+$ R CMD INSTALL scansnv-0.1.tar.gz
+```
+2. Install the Laplace approximator. First edit gridfit-gauss/Makefile.gcc (if you are
+   compiling with gcc) or gridfit-gauss/Makefile.icc (if you are using Intel's C
+   compiler) and set the paths to OpenBLAS and LAPACKE by modifying these two lines
+   to point to your local installation of OpenBLAS and LAPACKE.
+```
+OPENBLAS=/n/app/openblas/0.2.19
+LAPACKE=/n/app/lapacke/3.6.1
+```
+   Add the OpenBLAS library path to the linker path.
+```
+# Should be the same as $OPENBLAS with /lib appended
+$ export LD_LIBRARY_PATH=/path/to/openblas/lib  
+```
+   Compile the approximator program.
+```
+$ cd gridfit-gauss
+$ make -f Makefile.gcc   # or -f Makefile.icc if Intel C compiler is available
+```
+3. Add the helper scripts and laplace approximator binary to the global path
+```
+# From the git repo root
+$ export PATH=$PATH:`realpath scripts`:`realpath bin`
+```
+4. Create a directory to contain the demo files and outputs.
+```
+$ cd /root/of/git/repo
+$ mkdir demo
+```
+5. Download demo BAM files. Save the downloaded files to the `demo` directory.
+   At least one single cell and the unamplified bulk must be used. We recommend
+   downloading hunamp and il-12. The two other kindred system samples are also
+   provided. Both the BAM and index file must be downloaded.
 
 * **[REQUIRED]** Unamplified cell line bulk\
     BAM: http://compbio.med.harvard.edu/scan-snv/hunamp.chr22.bam \
@@ -31,33 +69,9 @@ provided. Both the BAM and index file must be downloaded.
     BAM: http://compbio.med.harvard.edu/scan-snv/il-1c.chr22.bam \
     Index: http://compbio.med.harvard.edu/scan-snv/il-1c.chr22.bam.bai
 
-## STEP 1. Compile `laplace_cpu`
-
-**Dependencies**: LAPACKE (v3.6.1), OpenBLAS (v0.2.19)\
-**Optional dependencies**: Intel C compiler
-
-1. Edit mkl-gridfit-gauss/Makefile (or Makefile.gcc if using gcc) to point to
-   install paths for LAPACKE and OpenBLAS:
-
-```
-OPENBLAS=/n/app/openblas/0.2.19   # Set these 2 lines appropriately
-LAPACKE=/n/app/lapacke/3.6.1
-```
-2. Compile
-```
-make -f Makefile.gcc    # or Makefile.icc if using Intel C compiler
-```
-
-3. **IMPORTANT** Add OpenBLAS to the linker path.
-
-```
-# Should be the same as $OPENBLAS with /lib appended
-export LD_LIBRARY_PATH=/n/app/openblas/0.2.19/lib  
-```
 
 
-## STEP 2: Run GATK HaplotypeCaller on single cell and matched bulk data
-
+## STEP 1: Run GATK HaplotypeCaller on single cell and matched bulk data
 **Dependencies**: Java (v1.8), GATK (v3.8-0-ge9d806836)\
 **Data dependencies**: human reference genome (GRCh37 with decoy; e.g. `ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/b37/human_g1k_v37_decoy.fasta.gz`), dbSNP (v147, b37: e.g. `ftp://ftp.ncbi.nlm.nih.gov/snp/organisms/human_9606_b150_GRCh37p13/VCF/common_all_20170710.vcf.gz`)
 
@@ -98,7 +112,7 @@ REFPANEL_ROOT=/path/to/1000g_reference_panel
    taken only from the MMQ=60 GATK output.
 ```
 # Select only biallelic SNVs for phasing
-java -jar /path/to/GATK -T SelectVariants -R /path/to/human_g1k_v37_decoy.fasta \
+java -jar /path/to/GATK -R /path/to/human_g1k_v37_decoy.fasta \
     -T SelectVariants -V output_dir/hc_raw.mmq60.vcf \
     -selectType SNP -restrictAllelesTo BIALLELIC -env -trimAlternates \
     -select 'vc.getGenotype("hunamp").isCalled()' \
@@ -129,7 +143,7 @@ Rscript gridfit_slurm/torda.R output_dir/h25_hsnps.tab output_dir/training_chr%d
 ```
 
 2. Run the grid searching algorithm to find parameter MLEs. Using the parameters
-   below (ngrids=8, points-per-grid=400), the run took ~20 minutes. The parameters
+   below (ngrids=8, points-per-grid=400), the run took ~30 minutes. The parameters
    used in the manuscript were ngrids=20, points-per-grid=1000.
 ```
 mkdir -p output_dir/gridfit/chr22
@@ -140,11 +154,11 @@ mkdir -p output_dir/gridfit/chr22
     --ngrids 8 \          # Set this to the number of cores available
     --points-per-grid 400 \
     --resume \
-    --combine=../gridfit_slurm/combine.R \
-    --mkl-laplace=../mkl-gridfit-gauss/laplace_cpu_gcc \
+    --combine=./gridfit_slurm/combine.R \
+    --mkl-laplace=./mkl-gridfit-gauss/laplace_cpu_gcc \
     --outprefix=output_dir/gridfit/chr22
 ```
-    If the run is successful, the file `output_dir/gridfit/chr22/fit.rda` will be created.
+   If the run is successful, the file `output_dir/gridfit/chr22/fit.rda` will be created.
 
 3. Make the final fit file.
 ```
@@ -153,3 +167,20 @@ Rscript ./gridfit_slurm/make_fits.R
 
 
 ## STEP 5: Run SCAN-SNV
+
+1. Convert GATK VCFs into table format.
+```
+# A similar process has already been run for mmq60
+java -jar /path/to/GATK -R /path/to/human_g1k_v37_decoy.fasta \
+    -T SelectVariants -V output_dir/hc_raw.mmq1.vcf \
+    -selectType SNP -restrictAllelesTo BIALLELIC -env -trimAlternates \
+    -select 'vc.getGenotype("hunamp").isCalled()' \
+    -o output_dir/hc_raw.mmq1.snp.vcf
+
+totab.sh output_dir/hc_raw.mmq1.snp.vcf output_dir/mmq1.tab
+totab.sh output_dir/hc_raw.mmq60.snp.vcf output_dir/mmq60.tab
+
+# Make expected symlinks to the single cell BAMs
+ln -s ../il-12.chr22.bam wg.bam
+ln -s ../il-12.chr22.bam.bai wg.bam.bai
+```
