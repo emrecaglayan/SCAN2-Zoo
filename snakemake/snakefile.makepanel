@@ -8,10 +8,8 @@ rule vcf_to_tab:
     output:
         tabgz="panel/hc_raw.mmq60.tab.gz",
         tabidx="panel/hc_raw.mmq60.tab.gz.tbi",
-    log:
-        "panel/vcf_to_tab.log"
     resources:
-        mem_mb=1000
+        mem=1000
     benchmark:
         "gatk/benchmark_vcf_to_tab.txt"
     shell:
@@ -19,6 +17,7 @@ rule vcf_to_tab:
         {config[scripts]}/totab.panel.sh {input} /dev/stdout | bgzip -c > {output.tabgz}
         tabix -p vcf -S 1 {output.tabgz}
         """
+
 
 rule process_tab:
     input:
@@ -29,34 +28,15 @@ rule process_tab:
         tab=temp("panel/panel.tab"),
         tabgz="panel/panel.tab.gz",
         tabix="panel/panel.tab.gz.tbi"
-    log:
-        "panel/make_panel.log"
     params:
         genome=config['genome']
     benchmark:
         "panel/benchmark_make_panel.txt"
     threads: config['makepanel_n_cores']
     resources:
-        mem_mb=1500*config['makepanel_n_cores']
+        mem=1500*config['makepanel_n_cores']
     shell:
         """
         {config[scripts]}/make_panel.R \
             {input.tab} {input.meta} {output.tab} {params.genome} {threads}
-        """
-
-
-rule makepanel_benchmarks:
-    input:
-        # big hack: just listing the last benchmark file in the current pipeline. will definitely break later
-        "panel/benchmark_make_panel.txt"
-    output:
-        txt="makepanel_collected_benchmarks.txt"
-    log:
-        "makepanel_collected_benchmarks.log"
-    threads: 1
-    resources:
-        mem_mb=100
-    shell:
-        """
-        {config[scripts]}/collect_benchmarks.sh . {output.txt}
         """

@@ -91,7 +91,7 @@ results <- make.integrated.table(mmq60, mmq1, phasing, panel=panel,
     indel.max.bulk.alt=indel.max.bulk.alt,
     indel.max.bulk.af=indel.max.bulk.af,
     genome=genome,
-    legacy=legacy)
+    legacy=legacy,add.mutsig=FALSE)
 
 inttab <- results$gatk
 write.integrated.table(inttab=inttab, out.tab=out.tab, out.tab.gz=out.tab.gz)

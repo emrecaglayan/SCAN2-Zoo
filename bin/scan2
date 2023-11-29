@@ -57,10 +57,7 @@ scan2_param_defaults = {
     'digest_depth_n_cores': 20,
     'genotype_n_cores': 20,
     'integrate_table_n_cores': 20,
-    'compute_sensitivity': False,
-    'sensitivity_n_cores': 20,
     'makepanel_n_cores': 20,
-    'phased_hsnps_n_cores': 20,
     'rescue_n_cores': 12,
     'resample_M': 20,
     'mimic_legacy': False,
@@ -71,7 +68,7 @@ scan2_param_defaults = {
     'phaser': 'shapeit',
     'shapeit_refpanel': None,  # a directory, so readable_file fails
     'cross_sample_panel': None, # must be readable IF specified, but pipeline should run without it too
-    'scripts': '/opt/anaconda1anaconda2anaconda3/lib/scan2',  # also a directory
+    'scripts': '/home/boj924/SCAN2/scripts',  # also a directory
     'chr_prefix': '',          # be nice to remove this; requires snakefile changes
     'bam_map': {},             # maps sample name -> bam path
     'permtool_config_map': {},
@@ -87,7 +84,7 @@ scan2_param_defaults = {
 # Unlike params, all files listed here must be readable upon a call
 # to validate() or run().
 scan2_file_defaults = {
-    'snakefile': '/opt/anaconda1anaconda2anaconda3/lib/scan2/Snakefile',
+    'snakefile': '/home/boj924/SCAN2/Snakefile',
     'ref': None,
     'dbsnp': None,
     'bams': {},         # miscellaneous BAMs; not genotyped as single cells
@@ -100,8 +97,7 @@ scan2_file_defaults = {
     'permtool_bedtools_genome_file': None,
     'gatk_vcf': None,
     'eagle_refpanel': {},
-    'eagle_genmap': None,
-    'phased_hsnps': ''
+    'eagle_genmap': None
 }
 
 scan2_defaults = { **scan2_param_defaults, **scan2_file_defaults }
@@ -388,10 +384,8 @@ class Analysis:
             check_shapeit(self.cfg['shapeit_refpanel'])
         elif self.cfg['phaser'] == 'eagle':
             check_eagle(self.cfg['eagle_refpanel'], self.cfg['eagle_genmap'])
-        elif self.cfg['phaser'] == 'phased_hsnps':
-            check_phased_hsnps(self.cfg['phased_hsnps'])
         else:
-            error("--phaser must be either 'shapeit', 'eagle' or 'phased_hsnps'\n")
+            error("--phaser must be either 'shapeit' or 'eagle'\n")
 
 
     def validate(self):
@@ -490,22 +484,21 @@ def get_autosomes_from_ref(refpath):
         return [ line.split('\t')[0] for line in f ][0:22]
 
 
+#def check_dbsnp(dbsnp):
+#    """Check for the VCF index file (.idx).  Assumes dbsnp has already
+#       been checked."""
+#    if dbsnp is None:
+#        error("please provide a dbSNP VCF (--dbsnp)")
+#    readable_file(dbsnp)
+#    readable_file(dbsnp + '.idx')
+
 def check_dbsnp(dbsnp):
     """Check for the VCF index file (.idx).  Assumes dbsnp has already
        been checked."""
     if dbsnp is None:
         error("please provide a dbSNP VCF (--dbsnp)")
     readable_file(dbsnp)
-    readable_file(dbsnp + '.idx')
-
-
-def check_phased_hsnps(phased_hsnps):
-    """Just make sure the supplied dbsnp VCF is gzipped and tabix indexed."""
-    if phased_hsnps is None:
-        error("please provide a bgzipped, tabix-indexed VCF to --phased-hsnps")
-    if not phased_hsnps.lower().endswith(".gz"):
-        error("--phased-hsnps must be a bgzipped file ending in '.gz'")
-    readable_file(phased_hsnps + ".tbi")
+    readable_file(dbsnp + '.tbi')
 
 
 def check_shapeit(shapeit_panel):
@@ -739,24 +732,13 @@ def parse_snakemake_job_report(process):
         if line == '':
             continue
 
-        #if line == 'Job counts:' or line == 'count\tjobs':
-        # Now prints something like this:
-        # Job stats:
-        # job                      count    min threads    max threads
-        # ---------------------  -------  -------------  -------------
-        # abmodel_gather              11              1              1
-        # abmodel_scatter            242              1              1
-        if line.startswith('---------'):
+        if line == 'Job counts:' or line == 'count\tjobs':
             indata = True
             continue
 
         if indata:
             try:
-                # below converts multiple consecutive whitespace characters into
-                # one space, then splits on space
-                rulename, count, minthr, maxthr = \
-                    ' '.join(line.split()).split(' ')
-                #count, rulename = line.split('\t')
+                count, rulename = line.split('\t')
                 jobdict[rulename] = int(count)
             except ValueError:
                 # Thrown on the last line, which does not have a rule name
@@ -791,14 +773,18 @@ def do_progress(args):
         capture_output=True)
     dstatus = parse_snakemake_job_report(pstatus)
     dtotal = parse_snakemake_job_report(ptotal)
-    print(a.show())
-    print('')
-    for k, v in dtotal.items():
-        # __total is the total count, all is Snakemake's top-level dummy rule
-        if k != 'all':
-            n_complete = v - dstatus.get(k, 0)
-            k = 'Total progress' if k == '__total' else k
-            print('%-40s %s' % (k, progress_bar(n_complete, v)))
+    if args.verbose:
+        print(a.show())
+        print('')
+        for k, v in dtotal.items():
+            # __total is the total count, all is Snakemake's top-leel dummy rule
+            if k != 'all':
+                n_complete = v - dstatus.get(k, 0)
+                k = 'Total progress' if k == '__total' else k
+                print('%-40s %s' % (k, progress_bar(n_complete, v)))
+    else:
+        print('Total progress: %s' % \
+            progress_bar(dtotal['__total'] - dstatus['__total'], dtotal['__total']))
 
 
 
@@ -840,7 +826,7 @@ if __name__ == "__main__":
         type=str,
         help='PATH containing the SCAN2 analysis. Required for all subcommands.')
     ap.add_argument('--snakefile', metavar='PATH', type=str,
-        default='/opt/anaconda1anaconda2anaconda3/lib/scan2/Snakefile',
+        default='/home/boj924/SCAN2/Snakefile',
         help='Path to the main Snakefile.  Unlikely to be necessary for standard use.')
     subparsers = ap.add_subparsers(dest='subcommand')
 
@@ -875,10 +861,10 @@ if __name__ == "__main__":
     config_parser.add_argument('--verbose', action='store_true', default=False,
         help='Print detailed list of all configuration changes.')
     config_parser.add_argument('--scripts', metavar='PATH',
-        default='/opt/anaconda1anaconda2anaconda3/lib/scan2',
+        default='/home/boj924/SCAN2/scripts',
         help='Path to SCAN2 script files.  Usually points to an installed '
             'set of files.')
-    config_parser.add_argument('--gatk', default='gatk3_joint',
+    config_parser.add_argument('--gatk', default='gatk4_joint',
         choices=[ 'gatk3_joint', 'gatk4_joint', 'gatk4_gvcf', 'sentieon_joint' ],
         help='GATK version and strategy for generating candidate somatic '
              'mutations and cross-sample support. Valid values are "gatk3_joint", '
@@ -919,14 +905,6 @@ if __name__ == "__main__":
     config_parser.add_argument('--digest-depth-n-cores', default=20, type=int, metavar='N',
         help="Number of cores used to tabulate single cell and bulk sequencing "
              "depth.")
-    config_parser.add_argument('--compute-sensitivity', default=False, action='store_true',
-        help='Model somatic mutation detection sensitivity as a function of genomic position. '
-             'If this option is enabled, final SCAN2 objects will be output in sensitivity/<sample name>/scan2_object.rda '
-             'rather than the usual call_mutations/<sample name>/scan2_object.rda. SCAN2 objects '
-             'with sensitivity models are much larger than standard SCAN2 objects.')
-    config_parser.add_argument('--sensitivity-n-cores', default=20, type=int, metavar='N',
-        help='Number of cores used to collect depth and compute AB model estimates '
-             'genome-wide for spatial sensitivity estimation.')
     config_parser.add_argument('--permtool-callable-bed-n-cores', default=20, type=int, metavar='N',
         help="Number of cores to use when creating the BED of callable regions.")
     config_parser.add_argument('--permtool-make-permutations-n-cores', default=20, type=int, metavar='N',
@@ -1028,8 +1006,8 @@ if __name__ == "__main__":
     
     phasing = config_parser.add_argument_group('Phasing options',
         'Choose SHAPEIT2 or Eagle for phasing')
-    phasing.add_argument('--phaser', metavar='eagle|shapeit|phased_hsnps', type=str,
-        help='SHAPEIT2 does not provide a reference panel aligned to hg38. If your data are aligned to this genome version, please use Eagle instead. Eagle is currently untested for GRCh37, but may work. To skip population-based phasing, --phaser=phased_hsnps allows a phased VCF (using 0|1 and 1|0 phased genotypes) to be supplied via --phased-hsnps. The VCF must be bgzipped and tabix indexed and contain only heterozygous SNPs. This option can be useful when external information provides better phasing; e.g.: crossbred mouse strains, human samples with mother-father-sibling trio to infer phase or samples for which long-read data can provide read-backed phasing via physical linkage across most of the genome.')
+    phasing.add_argument('--phaser', metavar='eagle|shapeit', type=str,
+        help='SHAPEIT2 does not provide a reference panel aligned to hg38. If your data are aligned to this genome version, please use Eagle instead. Eagle is currently untested for GRCh37, but may work.')
     phasing.add_argument('--shapeit-refpanel', metavar='DIR',
         help='Path to the 1000 genomes project phase 3 SHAPEIT panel.  At this time, other phasing panels are not supported. This panel is required if phaser=shapeit.')
     phasing.add_argument('--parsimony-phasing', action='store_true',
@@ -1038,8 +1016,6 @@ if __name__ == "__main__":
         help='Path to the an Eagle compatible phasing panel. The reference panel is a set of BCF files, one per chromosome. File names must match the pattern ${chromosome}*.bcf. The user should take care to ensure that chromosome names contain the "chr" prefix to properly match the supplied reference genome. This parameter is required if phaser=eagle.')
     phasing.add_argument('--eagle-genmap', metavar='DIR',
         help='Path to Eagle\'s provided genetic map (can be found under the "tables" directory in the Eagle tarball). This is required if phaser=eagle.')
-    phasing.add_argument('--phased-hsnps', type=readable_file, metavar='VCF.GZ',
-        help='A bgzipped, tabix-indexed VCF file containing phased genotypes covering the majority of the genome for this individual. The VCF should contain only 10 columns, with the final genotype column being simply 0|1 or 1|0 depending on phase.')
     
     
     abmodel = config_parser.add_argument_group("AB model fitting",
@@ -1155,6 +1131,8 @@ if __name__ == "__main__":
     progress_parser = subparsers.add_parser('progress',
         help='Prints statistics regarding the progress of a SCAN2 run.')
     progress_parser.set_defaults(executor=do_progress)
+    progress_parser.add_argument('-v', '--verbose', action='store_true', default=False,
+        help='Show progress for individual rules.')
 
 
     ##########################################################################
