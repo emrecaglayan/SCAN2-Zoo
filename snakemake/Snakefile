@@ -22,6 +22,14 @@ if config['analysis'] == 'makepanel':
         input:
             "panel/panel.tab.gz"
 
+
+if config['analysis'] == 'joint_panel':
+    include: "snakefile.makepanel_joint"
+    rule makepanel:
+        input:
+            "panel/panel.tab.gz"
+
+
 if config['analysis'] == 'rescue':
     include: "snakefile.rescue"
     rule rescue_batch:

@@ -75,7 +75,7 @@ rule gatk_scatter:
             "-L " + config['gatk_regions'][int(wildcards.gatk_chunk) - 1],
         mmq="{gatk_mmq}"
     resources:
-        mem=4000
+        mem=8000
     benchmark:
         "gatk/{sample}/scatter_benchmark.mmq{gatk_mmq}_chunk{gatk_chunk}.tsv"
     shell:

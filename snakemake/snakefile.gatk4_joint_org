@@ -1,0 +1,26 @@
+# vim: syntax=python
+
+rule gatk_gather:
+    input:
+        vcf=lambda wildcards:
+                expand("gatk/hc_raw.mmq{gatk_mmq}_chunk{gatk_chunk}.vcf",
+                       gatk_mmq=wildcards.gatk_mmq,
+                       gatk_chunk=range(1, config['gatk_chunks']+1))
+    output:
+        vcf="gatk/hc_raw.mmq{gatk_mmq}.vcf"
+    params:
+        lambda wildcards:
+            ' '.join(expand("-I gatk/hc_raw.mmq{gatk_mmq}_chunk{gatk_chunk}.vcf",
+                            gatk_mmq=wildcards.gatk_mmq,
+                            gatk_chunk=range(1, config['gatk_chunks']+1)))
+    resources:
+        mem=4000
+    benchmark:
+        "gatk/gather_benchmark.mmq{gatk_mmq}.tsv"
+    shell:
+        "gatk GatherVcfs"
+        "    --java-options '-Xmx3G -Xms3G'"
+        "    {params}"
+        "    -R {config[ref]}"
+        "    -O {output.vcf}"
+

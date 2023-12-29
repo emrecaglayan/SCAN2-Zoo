@@ -1,0 +1,106 @@
+# vim: syntax=python
+
+rule gatk_combinegvcfs:
+    input:
+        gvcfs=lambda wildcards:
+                expand("{gvcf_dir}/hc_raw.mmq60_chunk{{gatk_chunk}}.gvcf.gz",
+                       gvcf_dir=config['gvcf_map'],
+                       gatk_chunk=range(1, config['gatk_chunks']+1))
+    output:
+        "gatk/hc_raw.mmq60_chunk{gatk_chunk}.gvcf.gz"
+    resources:
+        mem=8000
+    benchmark:
+        "gatk/combinegvcfs_benchmark.mmq60_chunk{gatk_chunk}.tsv"
+    params:
+        infiles=lambda wildcards, input:
+            ' '.join([ "--variant " + f for f in input ])
+    shell:
+        "gatk CombineGVCFs"
+        "   --java-options '-Xmx8G -Xmx8G'"
+        "   -R {config[ref]}"
+        "   {params.infiles}"
+        "   -O {output}"
+
+
+rule gatk_genotypegvcfs:
+    input:
+        gvcf="gatk/hc_raw.mmq60_chunk{gatk_chunk}.gvcf.gz"
+    output:
+        vcf="gatk/merge_mmq60_chunk{gatk_chunk}.vcf"
+    benchmark:
+        "gatk/genotypegvcfs_benchmark.mmq60_chunk{gatk_chunk}.tsv"
+    resources:
+        mem=8000
+    shell:
+        "gatk GenotypeGVCFs"
+        "   --java-options '-Xmx4G -Xms4G'"
+        "   --dbsnp {config[dbsnp]}"
+        "   -R {config[ref]}"
+        "   -V {input}"
+        "   -O {output}"
+
+
+rule gatk_gather:
+    input:
+        vcfs=lambda wildcards:
+                expand("gatk/merge_mmq60_chunk{gatk_chunk}.vcf",
+                       gatk_chunk=range(1, config['gatk_chunks']+1))
+    output:
+        vcf="gatk/merge_mmq60.vcf"
+    params:
+        lambda wildcards, input:
+            ' '.join([ "-I " + f for f in input ])
+    resources:
+        mem=4000
+    benchmark:
+        "gatk/gather_benchmark.mmq60.tsv"
+    shell:
+        "gatk GatherVcfs "
+        "    --java-options '-Xmx3G -Xms3G'"
+        "    {params} "
+        "    -R {config[ref]}"
+        "    -O {output.vcf}"
+
+
+rule vcf_to_tab:
+    input:
+        "gatk/merge_mmq60.vcf"
+    output:
+        tabgz="panel/merge_mmq60.tab.gz",
+        tabidx="panel/merge_mmq60.tab.gz.tbi",
+    resources:
+        mem=1000
+    benchmark:
+        "gatk/benchmark_vcf_to_tab.txt"
+    shell:
+        """
+        {config[scripts]}/totab.panel.sh {input} /dev/stdout | bgzip -c > {output.tabgz}
+        tabix -p vcf -S 1 {output.tabgz}
+        """
+
+
+rule process_tab:
+    input:
+        tab="panel/merge_mmq60.tab.gz",
+        tabgz="panel/merge_mmq60.tab.gz.tbi",
+        meta=lambda wildcards: config['makepanel_metadata']
+    output:
+        tab=temp("panel/panel.tab"),
+        tabgz="panel/panel.tab.gz",
+        tabix="panel/panel.tab.gz.tbi"
+    params:
+        genome=config['genome']
+    benchmark:
+        "panel/benchmark_make_panel.txt"
+    threads: config['makepanel_n_cores']
+    resources:
+        mem=1500*config['makepanel_n_cores']
+    shell:
+        """
+        {config[scripts]}/make_panel.R \
+            {input.tab} {input.meta} {output.tab} {params.genome} {threads}
+        """
+
+
+

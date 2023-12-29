@@ -367,6 +367,7 @@ class Analysis:
             error("All BAMs were annotated as 'bulk' in --makepanel-metadata. At least one single cell BAM is required for panel building.")
             
         # Make sure all sample IDs in the makepanel file exist in BAM map
+
         bam_samples = []
         if self.cfg['bulk_bam'] is not None:
             bam_samples += [ self.cfg['bulk_bam'] ]   # not a list like others
@@ -374,6 +375,8 @@ class Analysis:
             bam_samples += list(self.cfg['sc_bams'].keys())
         if self.cfg['bams'] is not None:
             bam_samples += list(self.cfg['bams'].keys())
+
+
         if not all([ s in bam_samples for s in samples ]):
             error('some samples listed in --makepanel-metadata have no associated BAM file (specified by --bam, --sc-bam, or --bulk-bam). Please ensure that every BAM in the metadata table is present. Note that samples IDs are automatically determined from BAM files by the SM: tag in the first read group (@RG record).')
         
