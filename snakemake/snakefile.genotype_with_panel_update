@@ -10,13 +10,12 @@ rule all:
 rule update_table:
     input:
         inttab="call_mutations/integrated_table.tab.gz",
-        panel=config["panel"]
+        panel=config["panel"],
     output:
-        outtab=temp("call_mutations/integrated_table_update.tab"),
+        outtab="call_mutations/integrated_table_update.tab",
         outtabgz="call_mutations/integrated_table_update.tab.gz",
-        outtabidx="call_mutations/integrated_table_update.tab.gz.tbi",
-      
-        details="call_mutations/germline_resampling_details_update.rda"
+        outtabidx="call_mutations/integrated_table_update.tab.gz.tbi", 
+        details="call_mutations/germline_resampling_details_update.rda",
     log:
         "call_mutations/integrate_tables_update.log"
     params:
@@ -29,8 +28,8 @@ rule update_table:
         "call_mutations/benchmark_integrate_tables_update.txt"
     shell:
         """
-        {config[scripts]}/panel_filter.R {input.inttab} {output.outtab} {input.panel} \
-                     {params.genome} {threads}
+        {config[scripts]}/panel_filter.R {input.inttab} {output.outtab} \
+		{input.panel} {params.genome} {threads} >& {log}
         """
  
 rule pregenotype:
