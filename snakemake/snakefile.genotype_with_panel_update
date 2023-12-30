@@ -14,8 +14,7 @@ rule update_table:
     output:
         outtab="call_mutations/integrated_table_update.tab",
         outtabgz="call_mutations/integrated_table_update.tab.gz",
-        outtabidx="call_mutations/integrated_table_update.tab.gz.tbi", 
-        details="call_mutations/germline_resampling_details_update.rda",
+        outtabidx="call_mutations/integrated_table_update.tab.gz.tbi",
     log:
         "call_mutations/integrate_tables_update.log"
     params:
