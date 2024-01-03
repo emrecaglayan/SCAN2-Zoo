@@ -868,7 +868,7 @@ if __name__ == "__main__":
         help='Path to SCAN2 script files.  Usually points to an installed '
             'set of files.')
     config_parser.add_argument('--gatk', default='gatk4_joint',
-        choices=[ 'gatk3_joint', 'gatk4_joint', 'gatk4_gvcf', 'sentieon_joint' ],
+        choices=[ 'gatk3_joint', 'gatk3_gvcf', 'gatk4_joint', 'gatk4_gvcf', 'sentieon_joint' ],
         help='GATK version and strategy for generating candidate somatic '
              'mutations and cross-sample support. Valid values are "gatk3_joint", '
              '"gatk4_joint", "gatk4_gvcf" and "sentieon_joint". Joint calling means that all BAMs '
