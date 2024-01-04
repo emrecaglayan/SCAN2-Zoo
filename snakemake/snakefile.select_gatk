@@ -16,6 +16,9 @@ elif config['gatk'] == 'gatk4_joint':
 elif config['gatk'] == 'gatk4_gvcf':
     include: "snakefile.gatk4_gvcf"
     print("Using GATK version 4 with GVCF calling (EXPERIMENTAL)!")
+elif config['gatk'] == 'gatk3_gvcf':
+    include: "snakefile.gatk3_gvcf"
+    print("Using GATK version 3 with GVCF calling (EXPERIMENTAL)!")
 elif config['gatk'] == 'sentieon_joint':
     include: "snakefile.gatk3_joint"
     include: "snakefile.sentieon_joint"

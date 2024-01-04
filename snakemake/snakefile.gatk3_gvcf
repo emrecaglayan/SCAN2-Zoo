@@ -10,17 +10,17 @@ rule gatk_gather:
         vcf="gatk/hc_raw.mmq{gatk_mmq}.vcf"
     params:
         lambda wildcards, input:
-            ' '.join([ "-V " + f for f in input ])
+            ' '.join([ "-I " + f for f in input ])
     resources:
         mem=4000
     benchmark:
         "gatk/gather_benchmark.mmq{gatk_mmq}.tsv"
     shell:
-        "gatk3 -Xmx3500M -Xms3500M"
-        "    -T CombineVariants"
+        "gatk GatherVcfs "
+        "    --java-options '-Xmx3G -Xms3G'"
         "    {params} "
         "    -R {config[ref]}"
-        "    -o {output.vcf}"
+        "    -O {output.vcf}"
 
 
 rule gatk_genotypegvcfs:
@@ -56,7 +56,7 @@ rule gatk_combinegvcfs:
         "gatk/combinegvcfs_benchmark.mmq{gatk_mmq}_chunk{gatk_chunk}.tsv"
     params:
         infiles=lambda wildcards, input:
-            ' '.join([ "-I " + f for f in input ])
+            ' '.join([ "-V " + f for f in input ])
     shell:
         "gatk3 -Xmx3500M -Xms3500M" 
         "   -T CombineGVCFs"
