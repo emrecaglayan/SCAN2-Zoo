@@ -16,11 +16,11 @@ rule gatk_combinegvcfs:
         infiles=lambda wildcards, input:
             ' '.join([ "--variant " + f for f in input ])
     shell:
-        "gatk CombineGVCFs"
-        "   --java-options '-Xmx8G -Xmx8G'"
+        "gatk3 -Xmx3500M -Xms3500M"
+        "   -T CombineGVCFs"
         "   -R {config[ref]}"
         "   {params.infiles}"
-        "   -O {output}"
+        "   -o {output}"
 
 
 rule gatk_genotypegvcfs:
@@ -33,12 +33,12 @@ rule gatk_genotypegvcfs:
     resources:
         mem=8000
     shell:
-        "gatk GenotypeGVCFs"
-        "   --java-options '-Xmx4G -Xms4G'"
+        "gatk3 -Xmx3500M -Xms3500M"
+        "   -T GenotypeGVCFs"
         "   --dbsnp {config[dbsnp]}"
         "   -R {config[ref]}"
         "   -V {input}"
-        "   -O {output}"
+        "   -o {output}"
 
 
 rule gatk_gather:

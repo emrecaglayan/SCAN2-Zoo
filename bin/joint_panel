@@ -27,7 +27,7 @@ scan2_param_defaults = {
     'analysis': 'joint_panel',
     'genome': 'CHM13v2.0',
     'is_started': False,
-    'gatk': 'gatk4_joint',
+    'gatk': 'gatk3_joint',
     'parsimony_phasing': False,
     'target_fdr': 0.01,
     'rescue_target_fdr': 0.01,
@@ -671,8 +671,8 @@ if __name__ == "__main__":
         default='/home/boj924/SCAN2/scripts',
         help='Path to SCAN2 script files.  Usually points to an installed '
             'set of files.')
-    config_parser.add_argument('--gatk', default='gatk4_joint',
-        choices=[ 'gatk3_joint', 'gatk4_joint', 'gatk4_gvcf', 'sentieon_joint' ],
+    config_parser.add_argument('--gatk', default='gatk3_joint',
+        choices=[ 'gatk3_joint','gatk3_gvcf', 'gatk4_joint', 'gatk4_gvcf', 'sentieon_joint' ],
         help='GATK version and strategy for generating candidate somatic '
              'mutations and cross-sample support. Valid values are "gatk3_joint", '
              '"gatk4_joint", "gatk4_gvcf" and "sentieon_joint". Joint calling means that all BAMs '
