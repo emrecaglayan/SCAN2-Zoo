@@ -27,7 +27,7 @@ rule update_table:
         "call_mutations/benchmark_integrate_tables_update.txt"
     shell:
         """
-        {config[scripts]}/panel_filter.R {input.inttab} {output.outtab} \
+        {config[scripts]}/panel_filter_sig.R {input.inttab} {output.outtab} \
 		{input.panel} {params.genome} {threads} >& {log}
         """
  
