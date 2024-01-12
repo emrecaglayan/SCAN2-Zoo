@@ -14,9 +14,6 @@ update_integrate_table <- function(
             gr <- grs[i,]
             pc <- perfcheck(paste('update results data',i), {
 		tab <- read.tabix.data(path=tab.path, region=gr, quiet=quiet,colClasses=list(character='chr'))		
-                sitewide <- tab[,1:7]
-                samplespecific <- tab[,-(1:7)]
-
 		panel <- read.tabix.data(path=panel.path, region=gr, quiet=quiet, colClasses=list(character='chr'))
 		tab[panel, on=.(chr,pos),
 			c('nalleles', 'unique.donors', 'unique.cells', 'unique.bulks', 'max.out', 'sum.out', 'sum.bulk') :=

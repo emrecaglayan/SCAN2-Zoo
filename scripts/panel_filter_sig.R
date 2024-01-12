@@ -15,10 +15,10 @@ update_integrate_table <- function(
             pc <- perfcheck(paste('update results data',i), {
 		tab <- read.tabix.data(path=tab.path, region=gr, quiet=quiet,colClasses=list(character='chr'))		
 		annotate.gatk(gatk=tab, genome.string=genome.string, add.mutsig=TRUE)
-		annotate.gatk.candidate.loci(sitewide,
-                    snv.min.bulk.dp=snv.min.bulk.dp,snv.max.bulk.alt=Inf,snv.max.bulk.af=1,
-                    indel.min.bulk.dp=indel.min.bulk.dp,indel.max.bulk.alt=Inf,indel.max.bulk.af=1,
-                    mode=ifelse(legacy, 'legacy', 'new'))  
+#		annotate.gatk.candidate.loci(tab,
+#                    snv.min.bulk.dp=snv.min.bulk.dp,snv.max.bulk.alt=Inf,snv.max.bulk.af=1,
+#                    indel.min.bulk.dp=indel.min.bulk.dp,indel.max.bulk.alt=Inf,indel.max.bulk.af=1,
+#                    mode='new')  
 
 		panel <- read.tabix.data(path=panel.path, region=gr, quiet=quiet, colClasses=list(character='chr'))
 		tab[panel, on=.(chr,pos),
