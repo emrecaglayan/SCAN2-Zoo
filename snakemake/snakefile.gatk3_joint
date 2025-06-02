@@ -58,7 +58,6 @@ rule gatk_scatter:
         "    -T HaplotypeCaller"
         "    -R {config[ref]}"
         "    --dontUseSoftClippedBases -l INFO"
-        "    --dbsnp {config[dbsnp]}"
         "    -rf BadCigar "
         "    -mmq {params.mmq}"
         "    {params.bamlist}"

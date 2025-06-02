@@ -29,10 +29,17 @@ genome.string <- y$genome
 legacy <- y$mimic_legacy
 target.fdr <- y$target_fdr
 
-library(scan2)
-library(future)
-library(progressr)
+suppressMessages(library(scan2))
+suppressMessages(library(future))
+suppressMessages(library(progressr))
+suppressMessages(library(binom))
 plan(multicore, workers=n.cores)
+
+
+# Load the modified script
+source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
+
+grs = retry_genome_string_to_tiling(genome.string)
 
 with_progress({
     # handler_newline causes alot of printing, but it's log-friendly
@@ -44,8 +51,9 @@ with_progress({
         trainingcigars=cigardata, dptab=dptab,
         config.yaml=config.yaml,
         target.fdr=target.fdr,
-        genome=genome.string,
+        genome=genome.string, grs = grs,
         verbose=FALSE, report.mem=TRUE, legacy=legacy)
 }, enable=TRUE)
 
 save(results, file=out.rda, compress=FALSE)
+

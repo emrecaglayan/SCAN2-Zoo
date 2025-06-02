@@ -5,9 +5,7 @@ rule integrate_tables:
         mmq60="call_mutations/mmq60.tab.gz",
         mmq60idx="call_mutations/mmq60.tab.gz.tbi",
         mmq1="call_mutations/mmq1.tab.gz",
-        mmq1idx="call_mutations/mmq1.tab.gz.tbi",
-        phasing=config['phaser'] + "/phased_hets.vcf.gz",
-        phasingidx=config['phaser'] + "/phased_hets.vcf.gz.tbi"
+        mmq1idx="call_mutations/mmq1.tab.gz.tbi"
     output:
         tab=temp("call_mutations/integrated_table.tab"),
         tabgz="call_mutations/integrated_table.tab.gz",
@@ -29,7 +27,7 @@ rule integrate_tables:
         cross_sample_panel=config['cross_sample_panel']
     threads: config['integrate_table_n_cores']
     resources:
-        mem=2000*config['integrate_table_n_cores']
+        mem=3000*config['integrate_table_n_cores']
     benchmark:
         "call_mutations/benchmark_integrate_tables.txt"
     script:

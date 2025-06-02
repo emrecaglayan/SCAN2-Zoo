@@ -57,6 +57,9 @@ suppressMessages(library(future))
 suppressMessages(library(progressr))
 plan(multicore, workers=n.cores)
 
+# Load the modified script
+source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
+
 if (!is.null(add.muts))
     add.muts <- data.table::fread(add.muts)
 

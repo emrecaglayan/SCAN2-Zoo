@@ -4,7 +4,6 @@ wildcard_constraints:
     chr='|'.join(str(x) for x in config['chrs']),
     gatk_chunk="\d+",
     gatk_mmq="\d+",
-    phaser="shapeit|eagle",
     muttype='snv|indel',
     passtype='pass|rescue'
 

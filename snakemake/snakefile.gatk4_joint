@@ -44,7 +44,6 @@ rule gatk_scatter:
         "gatk HaplotypeCaller"
         "    --java-options '-Xmx3500M -Xms3500M'"
         "    --dont-use-soft-clipped-bases"
-        "    --dbsnp {config[dbsnp]}"
         "    --minimum-mapping-quality {params.mmq}"
         "    --emit-ref-confidence NONE"
         "    {params.regionflag}"

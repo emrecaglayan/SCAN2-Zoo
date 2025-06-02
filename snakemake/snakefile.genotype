@@ -13,13 +13,13 @@ rule pregenotype:
         cigardataidx="call_mutations/{sample}/cigardata.tab.gz.tbi",
     log:
         "call_mutations/{sample}/call_mutations.log"
-    threads: 1
     params:
         sc_sample="{sample}",
         bulk_sample=config['bulk_sample'],
         genome=config['genome']
     resources:
-        mem=8000
+        mem=128000,
+	threads=5
     benchmark:
         "call_mutations/{sample}/benchmark_pregenotyping.txt"
     shell:
@@ -52,10 +52,11 @@ rule genotype:
         # bit of a hack here: assumes the script is run from the root of the
         # working directory (i.e., the same as is assumed for input/output
         # file names).
-        config_yaml='scan.yaml'
-    threads: config['genotype_n_cores']
+        config_yaml='scan.yaml',
+	ncores=config['genotype_n_cores']*2
     resources:
-        mem=1500*config['genotype_n_cores']
+        mem=6000*config['genotype_n_cores']*2,
+        threads=config['genotype_n_cores']*2
     benchmark:
         "call_mutations/{sample}/benchmark_genotype.txt"
     shell:
@@ -65,5 +66,5 @@ rule genotype:
            {input.inttab} {input.fits} \
            {input.sccigars} {input.bulkcigars} \
            {input.cigardata} {input.dptab} \
-           {output} {threads} >& {log}
+           {output} {resources.threads} >& {log}
         """

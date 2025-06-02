@@ -37,7 +37,8 @@ sc.sample <- args[3]
 genome <- args[4]
 chrom <- args[5]
 out.rda <- args[6]
-n.tiles <- as.integer(args[7])
+n.tiles <- args[7]
+
 if (length(args) == 8) {
     library(future)
     plan(multicore)
@@ -53,11 +54,16 @@ if (file.exists(out.rda))
 
 suppressMessages(library(scan2))
 suppressMessages(library(future))
+suppressMessages(library(binom))
+
+# Load the modified script
+source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
 
 cat(future::availableCores(), "cores detected by library(future),", n.cores, "requested by user", "\n")
 plan(multicore, workers=n.cores)
 
-s <- make.scan(bulk=bulk.sample, genome=genome, single.cell=sc.sample)
+s = make.scan(bulk=bulk.sample, genome=genome, single.cell=sc.sample)
+
 
 f <- compute.ab.fits(s, path=int.tab.bgz, chroms=chrom, n.tiles=n.tiles)
 

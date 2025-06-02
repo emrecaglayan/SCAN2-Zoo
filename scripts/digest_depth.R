@@ -47,6 +47,9 @@ suppressMessages(library(future))
 suppressMessages(library(progressr))
 plan(multicore, workers=n.cores)
 
+# Load the modified script
+source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
+
 progressr::with_progress({
     # handler_newline causes alot of printing, but it's log-friendly
     progressr::handlers(progressr::handler_newline())

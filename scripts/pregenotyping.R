@@ -21,13 +21,19 @@ for (outfile in c(paste0(out.cigars, c('', '.gz', '.tbi')))) {
 
 suppressMessages(library(scan2))
 suppressMessages(library(Rsamtools))
+suppressMessages(library(binom))
 
 print(bulk.id)
 print(sc.id)
 print(genome)
 
+# Load the modified script
+source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
+
 s <- make.scan(sc.id, bulk.id, genome)
 s <- read.integrated.table(s, int.tab, quiet=TRUE)
+s@gatk$chr = as.character(s@gatk$chr)
+
 s <- add.cigar.data(s, sccigars, bulkcigars, quiet=TRUE)
 null.sites <- cigar.get.null.sites(s, legacy=TRUE, quiet=TRUE)
 null.sites <- null.sites[, .(chr, pos, refnt, altnt, muttype, M.cigars, ID.cigars, HS.cigars, other.cigars, dp.cigars, M.cigars.bulk, ID.cigars.bulk, HS.cigars.bulk, other.cigars.bulk, dp.cigars.bulk)]

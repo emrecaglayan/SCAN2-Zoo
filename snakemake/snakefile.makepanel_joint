@@ -35,7 +35,6 @@ rule gatk_genotypegvcfs:
     shell:
         "gatk3 -Xmx3500M -Xms3500M"
         "   -T GenotypeGVCFs"
-        "   --dbsnp {config[dbsnp]}"
         "   -R {config[ref]}"
         "   -V {input}"
         "   -o {output}"

@@ -14,7 +14,7 @@ update_integrate_table <- function(
             gr <- grs[i,]
             pc <- perfcheck(paste('update results data',i), {
 		tab <- read.tabix.data(path=tab.path, region=gr, quiet=quiet,colClasses=list(character='chr'))		
-		annotate.gatk(gatk=tab, genome.string=genome.string, add.mutsig=TRUE)
+		annotate.gatk(gatk=tab, genome.string=genome.string, add.mutsig=F)
 #		annotate.gatk.candidate.loci(tab,
 #                    snv.min.bulk.dp=snv.min.bulk.dp,snv.max.bulk.alt=Inf,snv.max.bulk.af=1,
 #                    indel.min.bulk.dp=indel.min.bulk.dp,indel.max.bulk.alt=Inf,indel.max.bulk.af=1,
@@ -56,6 +56,9 @@ library(scan2)
 library(future)
 library(progressr)
 plan(multicore, workers=n.cores)
+
+# Load the modified script
+source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
 
 update_integrate_table(in.rda, panel.path, out.rda, genome)
 

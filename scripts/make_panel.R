@@ -25,6 +25,9 @@ library(future)
 library(future.apply)
 library(progressr)
 
+# Load the modified script
+source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
+
 if (n.cores > 1) {
     plan(multicore, workers=n.cores)
 } else {

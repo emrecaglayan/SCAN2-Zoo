@@ -35,7 +35,6 @@ rule gatk_genotypegvcfs:
     shell:
         "gatk GenotypeGVCFs"
         "   --java-options '-Xmx4G -Xms4G'"
-        "   --dbsnp {config[dbsnp]}"
         "   -R {config[ref]}"
         "   -V {input}"
         "   -O {output}"
@@ -82,7 +81,6 @@ rule gatk_scatter:
         "gatk HaplotypeCaller"
         "    --java-options '-Xmx3500M -Xms3500M'"
         "    --dont-use-soft-clipped-bases"
-        "    --dbsnp {config[dbsnp]}"
         "    --minimum-mapping-quality {params.mmq}"
         "    --emit-ref-confidence GVCF"
         "    --min-base-quality-score {config[min_base_quality_score]}"

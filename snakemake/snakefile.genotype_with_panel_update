@@ -20,15 +20,16 @@ rule update_table:
     params:
         genome=config['genome'],
         config_yaml='scan.yaml',    # quite the hack. would really prefer not to do this
-    threads: config['integrate_table_n_cores']
+    #threads: config['integrate_table_n_cores']
     resources:
-        mem=2000*config['integrate_table_n_cores']
+        mem=2000*config['integrate_table_n_cores'],
+	threads=config['integrate_table_n_cores']
     benchmark:
         "call_mutations/benchmark_integrate_tables_update.txt"
     shell:
         """
         {config[scripts]}/panel_filter_sig.R {input.inttab} {output.outtab} \
-		{input.panel} {params.genome} {threads} >& {log}
+		{input.panel} {params.genome} {resources.threads} >& {log}
         """
  
 rule pregenotype:
@@ -44,13 +45,14 @@ rule pregenotype:
         cigardataidx="call_mutations/{sample}/cigardata_update.tab.gz.tbi",
     log:
         "call_mutations/{sample}/call_mutations_update.log"
-    threads: 1
+    #threads: 1
     params:
         sc_sample="{sample}",
         bulk_sample=config['bulk_sample'],
         genome=config['genome']
     resources:
-        mem=8000
+        mem=128000,
+	threads=1
     benchmark:
         "call_mutations/{sample}/benchmark_pregenotyping_update.txt"
     shell:
@@ -84,9 +86,10 @@ rule genotype:
         # working directory (i.e., the same as is assumed for input/output
         # file names).
         config_yaml='scan.yaml'
-    threads: config['genotype_n_cores']
+    #threads: config['genotype_n_cores']*3
     resources:
-        mem=1500*config['genotype_n_cores']
+        mem=6000*config['genotype_n_cores']*3,
+	threads=config['genotype_n_cores']*3
     benchmark:
         "call_mutations/{sample}/benchmark_genotype_update.txt"
     shell:
@@ -96,7 +99,7 @@ rule genotype:
            {input.inttab} {input.fits} \
            {input.sccigars} {input.bulkcigars} \
            {input.cigardata} {input.dptab} \
-           {output} {threads} >& {log}
+           {output} {resources.threads} >& {log}
         """
 
 

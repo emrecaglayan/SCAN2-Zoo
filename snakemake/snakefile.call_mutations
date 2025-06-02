@@ -4,7 +4,6 @@
 # For now, just for organizing rules into manageably-sized files.
 include: "snakefile.select_gatk"
 include: "snakefile.depth_profile"
-include: "snakefile.phasing"
 include: "snakefile.cigars"
 include: "snakefile.integrated_table"
 
@@ -20,8 +19,7 @@ include: "snakefile.genotype"
 wildcard_constraints:
     chr='|'.join(str(x) for x in config['chrs']),
     gatk_chunk="\d+",
-    gatk_mmq="\d+",
-    phaser="shapeit|eagle"
+    gatk_mmq="\d+"
 
 if config['gatk_vcf'] is not None:
     # Contains a single rule that overrides gatk_gather for mmq60

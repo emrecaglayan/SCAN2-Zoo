@@ -26,9 +26,9 @@ from sys import exit
 scan2_param_defaults = {
     'analysis': 'call_mutations',
     'genome': 'hs37d5',
+    'bsgenome': 'BSgenome.Hsapiens.UCSC.hg19',
     'is_started': False,
     'gatk': 'gatk3_joint',
-    'parsimony_phasing': False,
     'target_fdr': 0.01,
     'rescue_target_fdr': 0.01,
     'snv_min_sc_alt': 2,
@@ -41,6 +41,7 @@ scan2_param_defaults = {
     'indel_min_bulk_dp': 11, 
     'indel_max_bulk_alt': 0, 
     'indel_max_bulk_af': 0,
+    'indel_fraction_delta': 0.5,
     'min_base_quality_score': 20,
     'analyze_snvs': True,
     'analyze_indels': True,
@@ -65,8 +66,6 @@ scan2_param_defaults = {
     'gatk_chunks': None,
     'gatk_regions': [],
     'chrs': [],
-    'phaser': 'shapeit',
-    'shapeit_refpanel': None,  # a directory, so readable_file fails
     'cross_sample_panel': None, # must be readable IF specified, but pipeline should run without it too
     'scripts': '/home/boj924/SCAN2/scripts',  # also a directory
     'chr_prefix': '',          # be nice to remove this; requires snakefile changes
@@ -86,18 +85,15 @@ scan2_param_defaults = {
 scan2_file_defaults = {
     'snakefile': '/home/boj924/SCAN2/Snakefile',
     'ref': None,
-    'dbsnp': None,
     'bams': {},         # miscellaneous BAMs; not genotyped as single cells
     'sc_bams': {},      # BAMs for single cells, will be genotyped
-    'bulk_bam': None,   # single bulk BAM for phasing, filtering germlines
+    'bulk_bam': None,   # single bulk BAM for filtering germlines
     'scan2_objects': {},
     'add_muts': None,
     'makepanel_metadata': None,
     'permtool_muts': None,
     'permtool_bedtools_genome_file': None,
-    'gatk_vcf': None,
-    'eagle_refpanel': {},
-    'eagle_genmap': None
+    'gatk_vcf': None
 }
 
 scan2_defaults = { **scan2_param_defaults, **scan2_file_defaults }
@@ -286,15 +282,6 @@ class Analysis:
             # this is a list of tuples
             return { key : dict([ (sample, readable_file(file)) for sample, file in value ]) }
 
-        if key == 'phaser':
-            return { 'phaser': value.lower() }   # Just ensure lowercase
-
-        if key in [ 'eagle_refpanel' ]:
-            # value = the path to the Eagle ref panel
-            # Other sanity checks related to the reference panel are handled
-            # in check_phaser().
-            return { 'eagle_refpanel' : eagle_refpanel_files(value) }
-
         if key == 'gatk_vcf':
             # check that there is an associated VCF index file with the expected name
             readable_file(value + '.idx')
@@ -381,16 +368,6 @@ class Analysis:
             error('some samples listed in --makepanel-metadata have no associated BAM file (specified by --bam, --sc-bam, or --bulk-bam). Please ensure that every BAM in the metadata table is present. Note that samples IDs are automatically determined from BAM files by the SM: tag in the first read group (@RG record).')
         
 
-    def check_phaser(self):
-        # Determine the phaser and check relevant files.
-        if self.cfg['phaser'] == 'shapeit':
-            check_shapeit(self.cfg['shapeit_refpanel'])
-        elif self.cfg['phaser'] == 'eagle':
-            check_eagle(self.cfg['eagle_refpanel'], self.cfg['eagle_genmap'])
-        else:
-            error("--phaser must be either 'shapeit' or 'eagle'\n")
-
-
     def validate(self):
         """
         Check that all necessary files exist and ensure the list of
@@ -400,18 +377,12 @@ class Analysis:
             # Additional checks: index files
             print("Checking reference genome..")
             check_refgenome(self.cfg['ref'])
-            print("Checking dbSNP VCF..")
-            check_dbsnp(self.cfg['dbsnp'])
     
 
             if self.cfg['analysis'] == 'call_mutations':
                 # Additional checks: indexes, at least one bulk and one single cell
                 print("Checking BAMs..")
                 self.check_bams()
-
-                # Additional checks: very specific reference panel layout
-                print("Checking phasing reference panel..")
-                self.check_phaser()
 
             if self.cfg['analysis'] == 'makepanel':
                 print("Checking BAMs..")
@@ -485,69 +456,6 @@ def get_autosomes_from_ref(refpath):
     """
     with open(refpath + '.fai', 'r') as f:
         return [ line.split('\t')[0] for line in f ][0:22]
-
-
-#def check_dbsnp(dbsnp):
-#    """Check for the VCF index file (.idx).  Assumes dbsnp has already
-#       been checked."""
-#    if dbsnp is None:
-#        error("please provide a dbSNP VCF (--dbsnp)")
-#    readable_file(dbsnp)
-#    readable_file(dbsnp + '.idx')
-
-def check_dbsnp(dbsnp):
-    """Check for the VCF index file (.idx).  Assumes dbsnp has already
-       been checked."""
-    if dbsnp is None:
-        error("please provide a dbSNP VCF (--dbsnp)")
-    readable_file(dbsnp)
-    readable_file(dbsnp + '.tbi')
-
-
-def check_shapeit(shapeit_panel):
-    """Check all required SHAPEIT haplotype panel files. Exit if any are missing."""
-    if shapeit_panel is None:
-        error("no SHAPEIT reference panel provided (--shapeit-refpanel)")
-    if not os.path.exists(shapeit_panel):
-        error("SHAPEIT panel path does not exist: " + shapeit_panel)
-    if not os.path.isdir(shapeit_panel):
-        error("SHAPEIT panel path is not a directory; " + shapeit_panel)
-    for i in range(1, 23):
-        fname = 'genetic_map_chr{0}_combined_b37.txt'.format(i)
-        readable_file(os.path.join(shapeit_panel, fname))
-        for suf in [ 'hap', 'legend' ]:
-            fname = "1000GP_Phase3_chr{0}.{1}.gz".format(i, suf)
-            readable_file(os.path.join(shapeit_panel, fname))
-
-    # chrX is not consistently named
-    readable_file(os.path.join(shapeit_panel, "1000GP_Phase3_chrX_NONPAR.hap.gz"))
-    readable_file(os.path.join(shapeit_panel, "1000GP_Phase3_chrX_NONPAR.legend.gz"))
-    readable_file(os.path.join(shapeit_panel, "genetic_map_chrX_nonPAR_combined_b37.txt"))
-
-
-def eagle_refpanel_files(eagle_refpanel):
-    chrs = [ 'chr' + str(chrom) for chrom in list(range(1,23)) + [ 'X' ] ]
-    files = {}
-    for s in chrs:
-        files[s] = os.path.join(eagle_refpanel, '{0}_GRCh38.genotypes.bcf'.format(s))
-    return files
-
-
-def check_eagle(eagle_refpanel, eagle_genmap):
-    """This function is called in scan2 validate, which is AFTER the config
-    database has been parsed. So eagle_refpanel is a dict() chr -> file path,
-    not the path to the top level of the Eagle refpanel dir."""
-    if eagle_refpanel is None:
-        error("no Eagle reference panel provided (--eagle-refpanel)")
-
-    if eagle_genmap is None:
-        error("no Eagle genmap provided (--eagle-genmap)")
-    if not os.path.exists(eagle_genmap):
-        error("Provided Eagle genmap file does not exist: " + eagle_genmap)
-
-    for f in eagle_refpanel.values():
-        readable_file(f)
-        readable_file(f + '.csi')
 
 
 def sample_from_bam(bampath):
@@ -923,7 +831,7 @@ if __name__ == "__main__":
              'two additional files must be present: an index (.fai) and a '
              'dictionary (.dict).')
     req.add_argument('--genome', type=str,
-        choices=[ 'hs37d5', 'hg38', 'mm10' ],
+        choices=[ 'hs37d5', 'hg38', 'mm10', 'rheMac10', 'panTro6', 'calJac4' ],
         help='Reference genome to use.  This is not checked against '
              'the provided reference genome or phasing panels, the user '
              'must ensure these match the supplied genome.  It is used '
@@ -931,8 +839,9 @@ if __name__ == "__main__":
              'trinucleotide contexts around candidate mutations).  Valid '
              'values must match those recognized by the R SCAN2 package '
              '(see the genome.string.to.bsgenome.object function).')
-    req.add_argument('--dbsnp', type=readable_file, metavar='PATH',
-        help='Path to a tribble-indexed (NOT tabix indexed) dbSNP VCF.')
+    req.add_argument('--bsgenome', type=str,
+        choices=[ 'BSgenome.Hsapiens.UCSC.hg19', 'BSgenome.Ptroglodytes.UCSC.panTro6', 'BSgenome.Mmulatta.UCSC.rheMac10', 'BSgenome.Cjacchus.UCSC.calJac4' ],
+        help='Reference genome to use in R')
     
     infiles = config_parser.add_argument_group('Input sequencing data',
         'At least two BAM files must be specified: one via --bulk-bam'
@@ -958,7 +867,7 @@ if __name__ == "__main__":
     
     
     gatk = config_parser.add_argument_group('Genotyping intervals',
-        'These parameters allow the user to specify which portions of the genome should be genotyped.  By default, all autosomal regions will be analyzed.  Regions MUST be specified in the same order as the reference genome and should not overlap!!  The maximum target region is chrs 1-22 and X, due to the SHAPEIT reference panel.  Non-pseudoautosomal regions (PARs) on chrX may also be analyzed, but male samples may fail due to lack of hSNPs.  Initial GATK calling will be performed on each region in parallel if possible, which can greatly decrease runtime.')
+        'These parameters allow the user to specify which portions of the genome should be genotyped.  By default, all autosomal regions will be analyzed.  Regions MUST be specified in the same order as the reference genome and should not overlap!!  The maximum target region is chrs 1-22 and X.  Non-pseudoautosomal regions (PARs) on chrX may also be analyzed, but male samples may fail due to lack of hSNPs.  Initial GATK calling will be performed on each region in parallel if possible, which can greatly decrease runtime.')
     gatk.add_argument('--regions', metavar="STRING",
         help='A comma separated list of regions in GATK format: chr:start-stop, e.g. 22:30000001-31000000,22:31000001-32000000.  Cannot be specified in addition to --regions-file.')
     gatk.add_argument('--regions-file', metavar='PATH',
@@ -989,6 +898,8 @@ if __name__ == "__main__":
         help='Reject somatic indels supported by more than INT reads in bulk.')
     caller.add_argument('--indel-max-bulk-af', type=float,  metavar='FLOAT',
         help='Reject mosaic indels with VAF > FLOAT in bulk. E.g., --max-bulk-af=0.3.')
+    caller.add_argument('--indel-fraction-delta', type=float,  metavar='FLOAT',
+        help='Reject indels if bulk also has high number of indels.')
     caller.add_argument('--min-base-quality-score', type=int,
         help="Passed to GATK HaplotypeCaller's --min-base-quality-score. "
              "Currently only used in GATK4 GVCF.")
@@ -1005,22 +916,7 @@ if __name__ == "__main__":
              #'genome fraction is necessary for estimating the genome-wide '
              #'mutation burden. This flag is enabled by default; to disable, '
              #'callable region calculation, use --calable-regions false.')
-    
-    
-    phasing = config_parser.add_argument_group('Phasing options',
-        'Choose SHAPEIT2 or Eagle for phasing')
-    phasing.add_argument('--phaser', metavar='eagle|shapeit', type=str,
-        help='SHAPEIT2 does not provide a reference panel aligned to hg38. If your data are aligned to this genome version, please use Eagle instead. Eagle is currently untested for GRCh37, but may work.')
-    phasing.add_argument('--shapeit-refpanel', metavar='DIR',
-        help='Path to the 1000 genomes project phase 3 SHAPEIT panel.  At this time, other phasing panels are not supported. This panel is required if phaser=shapeit.')
-    phasing.add_argument('--parsimony-phasing', action='store_true',
-        help='Choose the phase of each training hSNP i to minimize |VAF_(i-1) - VAF_i|.  This overrides population-based phasing and does not produce well-phased mutations.  Instead, it ensures that switching errors (caused by panel phasing) in regions with allelic imbalance do not inflate model variance or lead to "ping-pong" allele balance estimates.')
-    phasing.add_argument('--eagle-refpanel', metavar='DIR',
-        help='Path to the an Eagle compatible phasing panel. The reference panel is a set of BCF files, one per chromosome. File names must match the pattern ${chromosome}*.bcf. The user should take care to ensure that chromosome names contain the "chr" prefix to properly match the supplied reference genome. This parameter is required if phaser=eagle.')
-    phasing.add_argument('--eagle-genmap', metavar='DIR',
-        help='Path to Eagle\'s provided genetic map (can be found under the "tables" directory in the Eagle tarball). This is required if phaser=eagle.')
-    
-    
+
     abmodel = config_parser.add_argument_group("AB model fitting",
         "These parameters control the exhaustive parameter search used to fit an AB correlation function for each chromosome.  This is by far the most time consuming step of the calling process.  None of these parameters are used for subsequent AB inference.")
     abmodel.add_argument('--abmodel-n-cores', type=int, metavar='INT',
