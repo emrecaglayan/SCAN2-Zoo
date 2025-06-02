@@ -4,19 +4,21 @@ args <- commandArgs(trailingOnly=TRUE)
 
 
 if (!(length(args) %in% 2:3)){
-    stop("usage: save_passes_and_artifacts.R config.yaml outdir [n.cores]")
+    stop("usage: save_passes_and_artifacts.R config.yaml [n.cores]")
 }
 
 yaml <- args[1]
-outdir <- args[2]
+outdir <- 'Artifacts_Panel'
+dir.create(outdir, showWarnings=F)
+
 n.cores <- 1
 if (length(args) == 3){
     n.cores <- as.integer(args[3])
 }
 
-library(scan2)
-library(parallel)
-library(data.table)
+suppressWarnings(library(scan2))
+suppressWarnings(library(parallel))
+suppressWarnings(library(data.table))
 
 # Read panel config and extract params
 yaml = yaml::read_yaml(yaml)
@@ -39,11 +41,11 @@ source(scripts)
 
 # Combine passes
 sc_samps = gsub('.*mutations/|/scan2.*', '', scan2_outs)
-passes = scan2_to_pass(scan2_outs[1:8], sc_samps[1:8], ncores = n.cores)
+passes = scan2_to_pass(scan2_outs, sc_samps, ncores = n.cores)
 
 # Combine artifacts (also includes passes)
-pass_artif = scan2_to_lenient_pass(scan2_files = scan2_outs[1:8],
-					samps = sc_samps[1:8],
+pass_artif = scan2_to_lenient_pass(scan2_files = scan2_outs,
+					samps = sc_samps,
 					ncores = n.cores,
 					lysis_cutoff = 1)
 
