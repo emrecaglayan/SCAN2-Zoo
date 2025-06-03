@@ -29,6 +29,22 @@ if config['analysis'] == 'joint_panel':
             "panel/panel.tab.gz"
 
 
+if config['analysis'] == 'refine_panel':
+    include: "snakefile.refine_panel"
+    rule base_save_passes_and_artifacts:
+        input:
+            "artifacts_panel/AllPasses.RDS",
+            "artifacts_panel/AllPassesArtifacts.RDS"
+
+
+if config['analysis'] == 'refine':
+    include: "snakefile.refine"
+    rule rescue_batch:
+        input:
+            expand("objects/{sample}_scan2_object_refine.rda",
+                sample=config['scan2_objects'].keys())
+
+
 if config['analysis'] == 'rescue':
     include: "snakefile.rescue"
     rule rescue_batch:
@@ -37,6 +53,7 @@ if config['analysis'] == 'rescue':
             "sig_homogeneity_tests.txt",
             expand("objects/{sample}_scan2_object_rescue.rda",
                 sample=config['scan2_objects'].keys())
+
 
 if config['analysis'] == 'permtool':
     include: "snakefile.permtool"

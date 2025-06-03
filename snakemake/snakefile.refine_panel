@@ -1,0 +1,17 @@
+# vim: syntax=python
+
+rule save_passes_and_artifacts:
+    input:
+        config_file = config["panel_config"]
+    output:
+        "artifacts_panel/AllPasses.RDS",
+        "artifacts_panel/AllPassesArtifacts.RDS"
+    threads: config["refinepanel_n_cores"]
+    resources:
+        mem=config["refinepanel_n_cores"]*8000
+    shell:
+        """
+        {config[scripts]}/save_passes_and_artifacts.R {input.config_file} {threads}
+        """
+
+

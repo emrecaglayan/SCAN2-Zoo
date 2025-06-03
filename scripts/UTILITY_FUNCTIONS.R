@@ -1,4 +1,146 @@
 
+compute_mutburden_new = function(object, gbp.per.genome = get.gbp.by.genome(object), 
+    quiet = FALSE, q1 = 0.4, q2 = 0.9) 
+{
+    check.slots(object, c("call.mutations", "depth.profile"))
+    muttypes <- c("snv", "indel")
+    object@mutburden <- setNames(lapply(muttypes, function(mt) {
+
+        pre.geno.burden <- object@fdr.prior.data[[mt]]$burden[2]
+        sfp <- object@static.filter.params[[mt]]
+        g <- object@gatk[resampled.training.site == TRUE & muttype == 
+            mt]
+        dptab <- object@depth.profile$dptab
+        dptab <- dptab[1:min(max(g$dp) + 1, nrow(dptab)), ]
+        if (nrow(g) < 100) {
+            warning(paste("only", nrow(g), "resampled germline", 
+                mt, "sites were detected; aborting genome-wide extrapolation. Typical whole-genome experiments include ~10-100,000 germline sites"))
+            ret <- data.frame(ncalls = NA, callable.sens = NA, 
+                callable.bp = NA)[c(1, 1, 1), ]
+        }
+        else {
+            s <- object@gatk[pass == TRUE & muttype == mt]
+            q = 4
+            qstouse <- c(1, 2, 4)
+            qbreaks <- quantile(g$dp, prob = c(0, q1, (q1+q2)/2, q2, 1.0))
+            if (length(unique(qbreaks)) != q + 1) {
+                ncalls <- rep(NA, 3)
+                callable.sens <- rep(NA, 3)
+                rowqs <- rep(NA, 3)
+                callable.bp <- rep(NA, 3)
+                warning(paste("could not derive unique breakpoints for quartiles of sequencing depth at germline hSNPs.  this usually indicates that sequencing depth is heavily skewed toward low depths (typically DP=0)\ngot qbreaks = ", 
+                  deparse(qbreaks)))
+            }
+            else {
+                s$dpq <- cut(s$dp, qbreaks, include.lowest = T, 
+                  labels = F)
+                s$dpq[s$dpq == 3] <- 2
+                g$dpq <- cut(g$dp, qbreaks, include.lowest = T, 
+                  labels = F)
+                g$dpq[g$dpq == 3] <- 2
+                rowqs <- cut(0:(nrow(dptab) - 1), qbreaks, include.lowest = T, 
+                  labels = F)
+                rowqs[rowqs == 3] <- 2
+                s <- s[dpq %in% qstouse]
+                g <- g[dpq %in% qstouse]
+                ncalls <- sapply(qstouse, function(q) sum(s[dpq == 
+                  q]$pass, na.rm = TRUE))
+                callable.bp <- sapply(split(dptab[, -(1:sfp$min.bulk.dp)], 
+                  rowqs), sum)
+                callable.sens <- sapply(qstouse, function(q) mean(g[bulk.dp >= 
+                  sfp$min.bulk.dp & dpq == q & resampled.training.site == 
+                  TRUE]$training.pass, na.rm = TRUE))
+            }
+            ret <- data.frame(ncalls = ncalls, callable.sens = callable.sens, 
+                callable.bp = callable.bp)
+        }
+        ret$callable.burden <- ret$ncalls/ret$callable.sens
+        ret$rate.per.gb <- ret$callable.burden/ret$callable.bp * 
+            1e+09/2
+        ret$burden <- ret$rate.per.gb * gbp.per.genome
+        ret$somatic.sens <- ret$ncalls/ret$burden
+        ret$pre.genotyping.burden <- pre.geno.burden
+        ret$unsupported.filters <- sfp$max.bulk.alt > 0 | sfp$max.bulk.af > 0
+        if (any(ret$unsupported.filters)) {
+            warning("mutation burdens must be extrapolated without clonal mutations (i.e., max.bulk.alt=0 and max.bulk.af=0)! burdens will be estimated, but they are invalid")
+        }
+        ret
+    }), muttypes)
+    object
+}
+
+
+recompute_burden = function(obj, calls_pass_snv, calls_pass_indel, cigar_change = F, lysis_change = F, lysis_thresh = 0.01, cigar_cutoff_fc = 1, cov_change = F, cov_thresh = 25, mtype, quantile1 = 0.25, quantile2 = 0.75){
+
+	# Extract gatk
+	raw_gatk = obj@gatk
+
+	# Give unique id to sites
+	raw_gatk[, id := paste0(chr, '_', pos, '_', refnt, '_', altnt)]
+	calls_pass_snv$id = paste0(calls_pass_snv$chr, '_', calls_pass_snv$pos, '_', calls_pass_snv$refnt, '_', calls_pass_snv$altnt)
+	calls_pass_indel$id = paste0(calls_pass_indel$chr, '_', calls_pass_indel$pos, '_', calls_pass_indel$refnt, '_', calls_pass_indel$altnt)
+
+	# Assign new mutations
+	raw_gatk$pass = F
+	raw_gatk[(id %in% calls_pass_snv$id) | (id %in% calls_pass_indel$id), pass := T]
+
+	if(cigar_change == T){
+
+	for(mtype in c('snv', 'indel')){
+
+		if(mtype == 'snv'){
+			# Extract score cutoffs
+			id_score_q = obj@excess.cigar.scores$snv$id.score.q
+			hs_score_q = obj@excess.cigar.scores$snv$hs.score.q
+
+			# Assign more strict cigar passes
+			raw_gatk = raw_gatk[, pass_strictCigar := muttype == 'snv' &
+					id.score > id_score_q*cigar_cutoff_fc &
+					hs.score > hs_score_q*cigar_cutoff_fc, ]
+			
+			# Remove somatic mutation calls and training.passes if they fail the new cigar filter
+			raw_gatk[muttype == 'snv' & pass == T & pass_strictCigar == F, pass := F]
+			raw_gatk[muttype == 'snv' & training.pass == T & pass_strictCigar == F, training.pass := F]
+
+		} else if(mtype == 'indel'){
+			# Extract score cutoffs
+			id_score_q = obj@excess.cigar.scores$indel$id.score.q
+			hs_score_q = obj@excess.cigar.scores$indel$hs.score.q
+
+			# Assign more strict cigar passes
+			raw_gatk = raw_gatk[, pass_strictCigar := muttype == 'indel' &
+					id.score > id_score_q*cigar_cutoff_fc &
+					hs.score > hs_score_q*cigar_cutoff_fc, ]
+			
+			# Remove somatic mutation calls and training.passes if they fail the new cigar filter
+			raw_gatk[muttype == 'indel' & pass == T & pass_strictCigar == F, pass := F]
+			raw_gatk[muttype == 'indel' & training.pass == T & pass_strictCigar == F, training.pass := F]
+		}
+	}
+	}
+
+	if(lysis_change == T){
+		raw_gatk[pass == T & lysis.pv >= lysis_thresh, pass := F]
+		raw_gatk[training.pass == T & lysis.pv >= lysis_thresh, training.pass := F]
+	}
+
+	if(cov_change == T){
+		raw_gatk[pass == T & dp <= cov_thresh, pass := F]
+		raw_gatk[training.pass == T & dp <= cov_thresh, training.pass := F]
+	}
+
+	obj@gatk = raw_gatk
+	old_mb = obj@mutburden
+
+	obj = compute_mutburden_new(object = obj,
+				gbp.per.genome = get.gbp.by.genome(obj),
+				quiet = F, q1 = quantile1, q2 = quantile2)
+
+	return(obj)
+}
+
+
+
 plot_mutprof_from_mutmat = function(mut_mat, genome_build, ref_genome,
 				prefix = '', hg = 7, wd1 = 14, wd2 = 10,
 				add_chr = F, ymax1 = 0.2, ymax2 = 1, plot = T,
@@ -95,7 +237,7 @@ find_clustered_snvs = function(obj = res, extsize = 5000, inpass){
 	return(inpass[unlist(indL),])
 }
 
-remove_bulk_mpileup = function(passes_file, bulk_bam_file, sc_bam_file, outfile, altnt = 'altnt', refnt = 'refnt', pos = 'pos', chr = 'chr'){
+remove_bulk_mpileup = function(passes_file, bulk_bam_file, outfile, altnt = 'altnt', refnt = 'refnt', pos = 'pos', chr = 'chr'){
 
 	tmpL = lapply(1:nrow(passes_file), function(x){
 
@@ -107,26 +249,7 @@ remove_bulk_mpileup = function(passes_file, bulk_bam_file, sc_bam_file, outfile,
 		ref_basecall = extract_basecall_and_read(bam = bulk_bam_file, outfile = outfile,
 								chr = as.character(site[,chr]),
 								pos = as.character(site[,pos]))
-		} else if(passes_file[x, 'muttype'] == 'indel'){
-
-		site = passes_file[x,]
-		alt = passes_file[x, altnt]
-		reflength = nchar(max(passes_file[x, refnt], passes_file[x, altnt]))
-		positions = paste(as.character( (site[,pos]):(site[,pos]+(reflength-1))), collapse = ',')
-
-		indel_basecall_bulk = extract_basecall_and_read(bam = bulk_bam_file, outfile = outfile,
-								chr = as.character(site$chr),
-								pos = positions)
-
-
-		indel_basecall_sc = extract_basecall_and_read(bam = sc_bam_file, outfile = outfile,
-								chr = as.character(site$chr),
-								pos = positions)
-
-
-		ref_basecall = indel_basecall[nchar(indel_basecall$V3) == reflength,]		
 		}
-
 		if(x%%50==0){print(x)}
 
 		ref_basecall$V3 = gsub("(.)\\1+", "\\1", ref_basecall$V3)
