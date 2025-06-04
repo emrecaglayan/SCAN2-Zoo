@@ -70,7 +70,7 @@ compute_mutburden_new = function(object, gbp.per.genome = get.gbp.by.genome(obje
 }
 
 
-recompute_burden = function(obj, calls_pass_snv, calls_pass_indel, cigar_change = F, lysis_change = F, lysis_thresh = 0.01, cigar_cutoff_fc = 1, cov_change = F, cov_thresh = 25, mtype, quantile1 = 0.25, quantile2 = 0.75){
+recompute_burden = function(obj, calls_pass_snv, calls_pass_indel, cigar_change = F, lysis_change = F, lysis_thresh = 0.01, cigar_cutoff_fc = 1, cov_change = F, cov_thresh = 25, quantile1 = 0.25, quantile2 = 0.75){
 
 	# Extract gatk
 	raw_gatk = obj@gatk

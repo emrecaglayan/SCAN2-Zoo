@@ -67,6 +67,7 @@ source(scripts)
 # Derived variables
 allpasses = readRDS(allpasses_fn)
 pass_artif = readRDS(allartifs_fn)
+meta = read.csv(metafile)
 
 outdir = 'objects'
 dir.create(outdir, showWarnings=F)
@@ -81,6 +82,11 @@ allpasses$id = paste0(allpasses$chr, '_', allpasses$pos, '_', allpasses$refnt, '
 res = get(load(scan2_fn))
 gatk = res@gatk
 gatk$id = paste(gatk$chr, gatk$pos, gatk$refnt, gatk$altnt, sep = '_')
+gatk_indel = gatk[gatk$muttype == 'indel',]
+gatk_snv = gatk[gatk$muttype == 'snv',]
+
+rm(gatk)
+gc()
 
 # Load all passes and artifacts
 pass_artif_snv = pass_artif[pass_artif$muttype == 'snv']
@@ -88,11 +94,12 @@ pass_artif_indel = pass_artif[pass_artif$muttype == 'indel']
 allpasses_snv = allpasses[allpasses$muttype == 'snv']
 allpasses_indel = allpasses[allpasses$muttype == 'indel']
 
+rm(pass_artif, allpasses)
+gc()
+
 ####
 ## INDELS
 ####
-
-gatk_indel = gatk[gatk$muttype == 'indel',]
 
 ## Remove if in bulk ##
 samp = basename(dirname(scan2_fn))
@@ -154,12 +161,12 @@ filt_cls_indel = find_clustered_snvs(obj = res, inpass = samp_passes_indel1)
 
 ## Remove if recurrent, even if filtered as a pre-amplification artifact ##
 # Check if any two cells share unusually high number of mutations
-subj = meta[meta$Sample == samp, 'donor']
+subj = meta[meta$sample == samp, 'donor']
 freq = allpasses_indel[allpasses_indel$donor == subj, 'id'] %>% table
 freq_two = names(freq[freq == 2])
 freq_two_cnts = allpasses_indel[allpasses_indel$id %in% freq_two, 'Sample'] %>%
 			table %>% sort(., decreasing = T)
-shared_ratio = (min(freq_two_cnts[1:2]) - freq_two_cnts[3]) / sum(na.omit(gatk$pass))
+shared_ratio = (min(freq_two_cnts[1:2]) - freq_two_cnts[3]) / sum(na.omit(gatk_indel$pass))
 shared_ratio = ifelse(is.na(shared_ratio), 0, shared_ratio)
 
 # If very few sSNVs are recurring, filter any recurrent sSNVs
@@ -195,7 +202,6 @@ gatk_indel[id %in% samp_passes_indel2$id, pass := T]
 ## SNVs
 ####
 
-gatk_snv = gatk[gatk$muttype == 'snv',]
 print(paste0('Processing sample for sSNV ', samp))
 
 ## Add the ones that are in the bulk up to 2 reads ##
@@ -221,7 +227,7 @@ outvcf = paste0(outdir, '/Snv_Regenotype_', samp, '.vcf')
 gatk_args <- c(
   "HaplotypeCaller",
   "-R", fastafile,
-  "-I", samp_bulk_bam,   # Use the variable here
+  "-I", samp_bulk_bam,
   "-O", outvcf,
   "--minimum-mapping-quality", "0",
   "--max-reads-per-alignment-start", "0",
@@ -265,12 +271,12 @@ filt_cls_snv = find_clustered_snvs(obj = res, inpass = samp_passes_snv1)
 
 ## Remove if recurrent, even if filtered as a pre-amplification artifact ##
 # Check if any two cells share unusually high number of mutations
-subj = meta[meta$Sample == samp, 'donor']
+subj = meta[meta$sample == samp, 'donor']
 freq = allpasses_snv[allpasses_snv$donor == subj, 'id'] %>% table
 freq_two = names(freq[freq == 2])
 freq_two_cnts = allpasses_snv[allpasses_snv$id %in% freq_two, 'Sample'] %>%
 			table %>% sort(., decreasing = T)
-shared_ratio = (min(freq_two_cnts[1:2]) - freq_two_cnts[3]) / sum(na.omit(gatk$pass))
+shared_ratio = (min(freq_two_cnts[1:2]) - freq_two_cnts[3]) / sum(na.omit(gatk_snv$pass))
 shared_ratio = ifelse(is.na(shared_ratio), 0, shared_ratio)
 
 # If very few sSNVs are recurring, filter any recurrent sSNVs
@@ -307,8 +313,8 @@ scan2_obj_newburden = recompute_burden(obj = res,
 				calls_pass_indel = samp_passes_indel2,
 				cigar_change = T, lysis_change = F,
 				cov_change = F,
-				cigar_cutoff_fc = 1.5, mtype = 'snv',
-				quantile1 = 0.33, quantile2 = 0.66)
+				cigar_cutoff_fc = 1.5,
+				quantile1 = 0.3, quantile2 = 0.8)
 
 # Get final passes
 samp_passes_snv_final = scan2_obj_newburden@gatk[scan2_obj_newburden@gatk$pass == T & scan2_obj_newburden@gatk$muttype == 'snv', ]
@@ -339,15 +345,25 @@ comb_filt_indel = do.call(rbind, list(filt_bulkgatk_indel, filt_morebulk_indel,
 comb_filt_snv = do.call(rbind, list(filt_bulkgatk_snv, filt_bulkmp_snv, filt_recur_snv,
 				filt_cls_snv, filt_final_snv))
 
-comb_filt_snv$Sample = samp
-comb_filt_indel$Sample = samp
-comb_filt_snv$sc.gt = comb_filt_snv[,..samp]
-comb_filt_indel$sc.gt = comb_filt_indel[,..samp]
+if(!is.null(comb_filt_indel)){
+	comb_filt_indel$Sample = samp
+	comb_filt_indel$sc.gt = comb_filt_indel[, .SD, .SDcols = samp]
+}
 
-samp_passes_snv_final$Sample = samp
-samp_passes_indel_final$Sample = samp
-samp_passes_snv_final$sc.gt = samp_passes_snv_final[,..samp]
-samp_passes_indel_final$sc.gt = samp_passes_indel_final[,..samp]
+if(!is.null(comb_filt_snv)){
+	comb_filt_snv$Sample = samp
+	comb_filt_snv$sc.gt = comb_filt_snv[, .SD, .SDcols = samp]
+}
+
+if(!is.null(samp_passes_snv_final)){
+	samp_passes_snv_final$Sample = samp
+	samp_passes_snv_final$sc.gt = samp_passes_snv_final[, .SD, .SDcols = samp]
+}
+
+if(!is.null(samp_passes_indel_final)){
+	samp_passes_indel_final$Sample = samp
+	samp_passes_indel_final$sc.gt = samp_passes_indel_final[, .SD, .SDcols = samp]
+}
 
 burden_df_snv = scan2_obj_newburden@mutburden$snv %>%
 		add_column(quantile = c('Q1', 'Q2', 'Q3')) %>% 
