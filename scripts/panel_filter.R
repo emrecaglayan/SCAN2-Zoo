@@ -46,7 +46,7 @@ if (length(args) == 5)
 if (file.exists(out.rda))
     stop(paste('output file', out.rda, 'already exists, please delete it first'))
 
-library(scan2)
+library(scanZooTrial1)
 library(future)
 library(progressr)
 plan(multicore, workers=n.cores)

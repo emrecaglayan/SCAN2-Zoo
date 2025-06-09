@@ -18,7 +18,7 @@ if (length(args) == 3){
 
 print(n.cores)
 
-suppressPackageStartupMessages(suppressWarnings(library(scan2)))
+suppressPackageStartupMessages(suppressWarnings(library(scanZooTrial1)))
 suppressPackageStartupMessages(suppressWarnings(library(parallel)))
 suppressPackageStartupMessages(suppressWarnings(library(data.table)))
 
@@ -39,7 +39,6 @@ if(length(scan2_outsL) > length(scan2_outs)){
 
 # For now, source the scripts that extract info from scan2 objects
 scripts = paste0(config$scripts, '/UTILITY_FUNCTIONS.R')
-scripts = gsub('SCAN2_BOWEN_NP', 'SCAN2_BOWEN_NP_TMP1', scripts)
 source(scripts)
 
 # Combine passes

@@ -46,7 +46,7 @@ if (length(args) == 8)
 if (file.exists(out.bed))
     stop(paste('output file', out.bed, 'already exists, please delete it first'))
 
-suppressMessages(library(scan2))
+suppressMessages(library(scanZooTrial1))
 suppressMessages(library(future))
 suppressMessages(library(progressr))
 plan(multicore, workers=n.cores)

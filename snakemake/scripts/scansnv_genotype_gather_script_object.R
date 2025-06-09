@@ -1,4 +1,4 @@
-library(scan2)
+library(scanZooTrial1)
 
 gt <- do.call(concat, lapply(snakemake@input[['rdas']], function(f) {
     print(f)

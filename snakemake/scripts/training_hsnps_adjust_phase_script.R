@@ -1,4 +1,4 @@
-library(scan2)
+library(scanZooTrial1)
 library(data.table)
 
 unadjusted <- fread(snakemake@input[['tab']])

@@ -19,14 +19,11 @@ for (outfile in paste0(outf, c('', '.gz', '.gz.tbi'))) {
         stop(sprintf("output file %s already exists, please delete it first", outf))
 }
 
-library(scan2)
+library(scanZooTrial1)
 library(Rsamtools)
 library(future)
 library(future.apply)
 library(progressr)
-
-# Load the modified script
-source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
 
 if (n.cores > 1) {
     plan(multicore, workers=n.cores)
@@ -114,7 +111,7 @@ cat("Bulks: ")
 print(meta[amp=='bulk']$sample)
 
 # GRanges intervals for chunked pipeline
-genome.seqinfo <- scan2::genome.string.to.seqinfo.object(genome)
+genome.seqinfo <- scanZooTrial1::genome.string.to.seqinfo.object(genome)
 grs <- tileGenome(seqlengths=genome.seqinfo[seqlevels(genome.seqinfo)[1:22]],
                   tilewidth=10e6, cut.last.tile.in.chrom=TRUE)
 
@@ -128,15 +125,15 @@ cat('Parallelizing with', future::nbrOfWorkers(), 'cores.\n')
 progressr::with_progress({
     handlers(handler_newline())
     p <- progressr::progressor(along=1:length(grs))
-    p(amount=0, class='sticky', scan2::perfcheck(print.header=TRUE))
+    p(amount=0, class='sticky', scanZooTrial1::perfcheck(print.header=TRUE))
     xs <- future.apply::future_lapply(1:length(grs), function(i) {
         gr <- grs[i,]
 
-        pc <- scan2::perfcheck(paste('read.alts.for.samples', i),
+        pc <- scanZooTrial1::perfcheck(paste('read.alts.for.samples', i),
             tb <- read.alts.for.samples(path=inf, region=gr, meta=meta))
         p(class='sticky', amount=0, pc)
 
-        pc <- scan2::perfcheck(paste('make.panel', i),
+        pc <- scanZooTrial1::perfcheck(paste('make.panel', i),
             ret <- make.panel(tb, dmap, meta[amp=='bulk']$sample))
         p(class='sticky', amount=0, pc)
 

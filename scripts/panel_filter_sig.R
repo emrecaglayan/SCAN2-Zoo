@@ -52,13 +52,10 @@ if (length(args) == 5)
 if (file.exists(out.rda))
     stop(paste('output file', out.rda, 'already exists, please delete it first'))
 
-library(scan2)
+library(scanZooTrial1)
 library(future)
 library(progressr)
 plan(multicore, workers=n.cores)
-
-# Load the modified script
-source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
 
 update_integrate_table(in.rda, panel.path, out.rda, genome)
 

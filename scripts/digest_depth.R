@@ -42,13 +42,10 @@ if (length(args) == 6)
 if (file.exists(out.rda))
     stop(paste('output file', out.rda, 'already exists, please delete it first'))
 
-suppressMessages(library(scan2))
+suppressMessages(library(scanZooTrial1))
 suppressMessages(library(future))
 suppressMessages(library(progressr))
 plan(multicore, workers=n.cores)
-
-# Load the modified script
-source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
 
 progressr::with_progress({
     # handler_newline causes alot of printing, but it's log-friendly

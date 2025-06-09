@@ -29,15 +29,12 @@ genome.string <- y$genome
 legacy <- y$mimic_legacy
 target.fdr <- y$target_fdr
 
-suppressMessages(library(scan2))
+suppressMessages(library(scanZooTrial1))
 suppressMessages(library(future))
 suppressMessages(library(progressr))
 suppressMessages(library(binom))
 plan(multicore, workers=n.cores)
 
-
-# Load the modified script
-source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
 
 grs = retry_genome_string_to_tiling(genome.string)
 

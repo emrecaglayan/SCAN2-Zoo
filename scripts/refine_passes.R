@@ -43,7 +43,7 @@ if(gb == 'hs37d5'){
 }
 
 # Load required libraries
-suppressPackageStartupMessages(suppressWarnings(require(scan2)))
+suppressPackageStartupMessages(suppressWarnings(require(scanZooTrial1)))
 suppressPackageStartupMessages(suppressWarnings(require(dplyr)))
 suppressPackageStartupMessages(suppressWarnings(require(ggpubr)))
 suppressPackageStartupMessages(suppressWarnings(require(parallel)))
@@ -54,7 +54,6 @@ suppressPackageStartupMessages(suppressWarnings(require(tidyverse)))
 suppressPackageStartupMessages(suppressWarnings(require(Seurat)))
 suppressPackageStartupMessages(suppressWarnings(require(vcfR)))
 suppressPackageStartupMessages(suppressWarnings(require(data.table)))
-source(paste0(config$scripts, '/Modified_SCAN2_Scripts_Minimal.R'))
 
 # For now, source the scripts that extract info from scan2 objects
 scripts = paste0(config$scripts, '/UTILITY_FUNCTIONS.R')

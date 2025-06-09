@@ -41,13 +41,10 @@ if ('snakemake' %in% ls()) {
 args <- commandArgs(trailingOnly=TRUE)
 
 # Load packages
-suppressMessages(library(scan2))
+suppressMessages(library(scanZooTrial1))
 suppressMessages(library(yaml))
 suppressMessages(library(future))
 suppressMessages(library(binom))
-
-# Load the modified script
-source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
 
 # Old variables are commented out
 mmq60 <- args[1]

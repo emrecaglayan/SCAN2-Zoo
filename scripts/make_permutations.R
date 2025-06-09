@@ -63,7 +63,7 @@ if (file.exists(out.rda))
     stop(paste('output file', out.rda, 'already exists, please delete it first'))
 
 
-suppressMessages(library(scan2))
+suppressMessages(library(scanZooTrial1))
 suppressMessages(library(future))
 suppressMessages(library(progressr))
 plan(multicore, workers=n.cores)

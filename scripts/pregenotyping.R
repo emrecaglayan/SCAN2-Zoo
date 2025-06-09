@@ -19,16 +19,13 @@ for (outfile in c(paste0(out.cigars, c('', '.gz', '.tbi')))) {
         stop(paste0('output file ', outfile, ' already exists, please delete it first'))
 }
 
-suppressMessages(library(scan2))
+suppressMessages(library(scanZooTrial1))
 suppressMessages(library(Rsamtools))
 suppressMessages(library(binom))
 
 print(bulk.id)
 print(sc.id)
 print(genome)
-
-# Load the modified script
-source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
 
 s <- make.scan(sc.id, bulk.id, genome)
 s <- read.integrated.table(s, int.tab, quiet=TRUE)

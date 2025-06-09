@@ -52,12 +52,9 @@ if (file.exists(out.rda))
     stop(paste('output file', out.rda, 'already exists, please delete it first'))
 
 
-suppressMessages(library(scan2))
+suppressMessages(library(scanZooTrial1))
 suppressMessages(library(future))
 suppressMessages(library(binom))
-
-# Load the modified script
-source('/home/ch253794/workdir/PROGRAMS/SCAN2_BOWEN_NP/scripts/Modified_SCAN2_Scripts_Minimal.R')
 
 cat(future::availableCores(), "cores detected by library(future),", n.cores, "requested by user", "\n")
 plan(multicore, workers=n.cores)
