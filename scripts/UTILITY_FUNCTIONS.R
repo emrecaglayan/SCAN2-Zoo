@@ -204,7 +204,7 @@ plot_mutprof_from_mutmat = function(mut_mat, genome_build, ref_genome,
 
 ppvenn = function(set1, set2, setnames){
 
-	require(VennDiagram)
+	suppressPackageStartupMessages(require(VennDiagram))
 	size1 = length(set1)
 	size2 = length(set2)
 	size3 = length(intersect(set1, set2))
@@ -264,8 +264,8 @@ remove_bulk_mpileup = function(passes_file, bulk_bam_file, outfile, altnt = 'alt
 
 scan2_to_lenient_pass = function(scan2_files, samps, ncores = 2, lysis_cutoff = 0.5){
 
-	require(dplyr)
-	require(parallel)
+	suppressPackageStartupMessages(require(dplyr))
+	suppressPackageStartupMessages(require(parallel))
 	# Load lysis fails from this database
 	gatkLysisL = mclapply(1:length(scan2_files), mc.cores = ncores, function(x){
 			obj = get(load(scan2_files[x]))
@@ -286,8 +286,8 @@ scan2_to_lenient_pass = function(scan2_files, samps, ncores = 2, lysis_cutoff = 
 
 add_mutsigs = function(mutdf, bsgenome, extension = 1, gb){
 
-	require(MutationalPatterns)
-	require(GenomicRanges)
+	suppressPackageStartupMessages(require(MutationalPatterns))
+	suppressPackageStartupMessages(require(GenomicRanges))
 
 	if(!grepl('chr', mutdf$chr[1])){
 		mutdf$chr = paste0('chr', mutdf$chr)
@@ -361,7 +361,7 @@ mutrate_comp_plot = function(mmu_df1, hsa_df1, sample_1, sample_2, annot_pos_x =
 
 plot_scan2_ab = function(scan2_fls, samps, ncores = 4, prefix, rand_n = 500000){
 
-	require(parallel)
+	suppressPackageStartupMessages(require(parallel))
 	print('Getting hetSNPs from SCAN2 object')
 
 	tmpL = mclapply(1:length(scan2_fls), mc.cores = ncores, function(x){
@@ -429,8 +429,8 @@ plot_indel_mutprof = function(mutdf, genome_build, ref_genome,
 scan2_to_pass = function(scan2_files, samps, ncores = 5, type = 'rda',
 			passColumn = 'pass', subsample = F, subsampleN){
 
-	require(dplyr)
-	require(parallel)
+	suppressPackageStartupMessages(require(dplyr))
+	suppressPackageStartupMessages(require(parallel))
 
 	passL = mclapply(1:length(scan2_files), mc.cores = ncores, function(x){
 		
@@ -457,9 +457,9 @@ scan2_to_pass = function(scan2_files, samps, ncores = 5, type = 'rda',
 
 scan2_to_burden = function(scan2_files, samps, ncores = 5, type = 'rda'){
 
-	require(tidyverse)
-	require(dplyr)
-	require(parallel)
+	suppressPackageStartupMessages(require(tidyverse))
+	suppressPackageStartupMessages(require(dplyr))
+	suppressPackageStartupMessages(require(parallel))
 
 	newbL = mclapply(1:length(scan2_files), mc.cores = ncores, function(x){
 		if(type == 'rda'){
