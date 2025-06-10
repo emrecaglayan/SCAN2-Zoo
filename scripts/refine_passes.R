@@ -310,8 +310,8 @@ gatk_snv[id %in% samp_passes_snv2$id, pass := T]
 scan2_obj_newburden = recompute_burden(obj = res,
 				calls_pass_snv = samp_passes_snv2,
 				calls_pass_indel = samp_passes_indel2,
-				cigar_change = T, lysis_change = F,
-				cov_change = F,
+				cigar_change = T, lysis_change = T,
+				cov_change = F, lysis_thresh = 0.05,
 				cigar_cutoff_fc = 1.5,
 				quantile1 = 0.3, quantile2 = 0.8)
 
@@ -380,7 +380,7 @@ burden_df = rbind(burden_df_snv, burden_df_indel)
 resL = list(burden_df, samp_passes_snv_final, samp_passes_indel_final, comb_filt_snv, comb_filt_indel)
 names(resL) = c('Burden', 'Passes_snv', 'Passes_indel', 'Filtered_snv', 'Filtered_indel')
 saveRDS(resL, paste0(outdir, '/', samp, '_final_burdens_and_calls.rds'))
-saveRDS(scan2_obj_newburden, paste0(outdir, '/', samp, '_scan2_object_refine.rds'))
+save(scan2_obj_newburden, file = paste0(outdir, '/', samp, '_scan2_object_refine.rds'))
 
 
 

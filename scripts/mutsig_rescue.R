@@ -60,7 +60,7 @@ plan(multicore, workers=n.cores)
 if (!is.null(add.muts))
     add.muts <- data.table::fread(add.muts)
 
-summary <- scan2::mutsig.rescue(setNames(in.rdas, out.rdas), add.muts=add.muts,
+summary <- scanZooTrial1::mutsig.rescue(setNames(in.rdas, out.rdas), add.muts=add.muts,
     rescue.target.fdr=rescue.target.fdr)
 
 data.table::fwrite(summary$muts, file=out.txt, sep='\t')

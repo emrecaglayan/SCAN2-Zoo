@@ -7,8 +7,8 @@ rule refine_passes:
     output:
         "objects/{sample}_scan2_object_refine.rds"
     resources:
-	# Most objects use <10GB but better to request 15GB just in case
-        mem=15000
+	# Most objects use <15GB but better to request 25GB just in case
+        mem=25000
     shell:
         """
         {config[scripts]}/refine_passes.R {input.config_file} {input.scan2_fn}
