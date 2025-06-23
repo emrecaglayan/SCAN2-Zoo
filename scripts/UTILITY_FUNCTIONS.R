@@ -1,6 +1,53 @@
+decide_cigar_cutoff = function(burdens, sample_name, slope_threshold = -0.3, loess_span = 0.75){
+
+	# This function only accepts a data frame of burdens with varying cigar cutoffs
+	# This function is only used when there is a big drop in burden estimate between
+	# the most lenient and most stringent cigar cutoffs.
+	# The goal of the function is to find the sweet spot so that drop in the mutation burden
+	# with increasing cigar stringency is accomplished without losing unnecessary amount of
+	# sensitivity.
+
+	cutoffs = burdens$cigar_cutoff
+	mutation_burden = rev(burdens$burden)
+	mutation_burden_sc = scale(mutation_burden)
+	library(scales)
+	# Smooth the curve
+	loess_fit <- loess(mutation_burden_sc ~ cutoffs, span = loess_span)
+	smoothed <- predict(loess_fit)
+
+	loess_fit_plt <- loess(mutation_burden ~ cutoffs, span = loess_span)
+	smoothed_plt <- predict(loess_fit_plt)
+
+	# Calculate slope (first derivative)
+	slopes <- diff(smoothed) / diff(cutoffs)
+
+	# Define a slope threshold (flattening = near-zero slope)
+	flattening_indices <- which(slopes > slope_threshold)
+
+	# Find the first point where flattening starts
+	if (length(flattening_indices) > 0) {
+	  elbow_index <- flattening_indices[1]
+	} else {
+	  elbow_index <- which.min(slopes)  # fallback: steepest point
+	}
+	elbow_cutoff <- cutoffs[elbow_index]
+
+	# Plot
+	pdf(paste0('CIGAR_BY_BURDEN_', sample_name, '.pdf'))
+	plot(cutoffs, mutation_burden, type = "b", pch = 19, col = "gray",
+	     main = "Last Point Before Flattening", xlab = "Cutoff", ylab = "Mutation Burden Z-Score")
+	lines(cutoffs, smoothed_plt, col = "blue", lwd = 2)
+	points(cutoffs[elbow_index], smoothed_plt[elbow_index], col = "red", pch = 19, cex = 1.5)
+	text(cutoffs[elbow_index], smoothed_plt[elbow_index],
+	     labels = paste0("Cutoff: ", round(elbow_cutoff, 3)), pos = 3, col = "red")
+	dev.off()
+
+	cat("Chosen cigar cutoff:", elbow_cutoff, "\n")
+	return(elbow_cutoff)
+}
 
 compute_mutburden_new = function(object, gbp.per.genome = get.gbp.by.genome(object), 
-    quiet = FALSE, q1 = 0.4, q2 = 0.9) 
+    quiet = FALSE, q1 = 0.3, q2 = 0.8) 
 {
     check.slots(object, c("call.mutations", "depth.profile"))
     muttypes <- c("snv", "indel")
@@ -70,7 +117,7 @@ compute_mutburden_new = function(object, gbp.per.genome = get.gbp.by.genome(obje
 }
 
 
-recompute_burden = function(obj, calls_pass_snv, calls_pass_indel, cigar_change = F, lysis_change = F, lysis_thresh = 0.01, cigar_cutoff_fc = 1, cov_change = F, cov_thresh = 25, quantile1 = 0.25, quantile2 = 0.75){
+recompute_burden = function(obj, calls_pass_snv, calls_pass_indel, cigar_change = F, lysis_change = F, lysis_thresh = 0.01, cigar_cutoff_fc = 1, cov_change = F, cov_thresh = 25, quantile1 = 0.25, quantile2 = 0.75, mtypes = c('snv', 'indel')){
 
 	# Extract gatk
 	raw_gatk = obj@gatk
@@ -86,7 +133,7 @@ recompute_burden = function(obj, calls_pass_snv, calls_pass_indel, cigar_change 
 
 	if(cigar_change == T){
 
-	for(mtype in c('snv', 'indel')){
+	for(mtype in mtypes){
 
 		if(mtype == 'snv'){
 			# Extract score cutoffs
@@ -197,28 +244,6 @@ plot_mutprof_from_mutmat = function(mut_mat, genome_build, ref_genome,
 	}
 
 	return(mut_mat)
-}
-
-
-
-
-ppvenn = function(set1, set2, setnames){
-
-	suppressPackageStartupMessages(require(VennDiagram))
-	size1 = length(set1)
-	size2 = length(set2)
-	size3 = length(intersect(set1, set2))
-	fn = paste0(paste(setnames, collapse = '_'), '_Overlap.pdf')
-
-	pdf(fn, width = 8)
-	print( draw.pairwise.venn(area1 = size2,
-		area2 = size1,
-		cross.area = size3, print.mode = c('raw', 'percent'),
-		fill = c('orange', 'darkgreen'), col = c('orange', 'darkgreen'),
-		category = c(setnames[1], setnames[2]), fontface = 'bold', cex = 2,
-		cat.cex = 2, cat.fontface = 'bold', margin = 0.05) )
-	dev.off()
-
 }
 
 
@@ -358,44 +383,6 @@ mutrate_comp_plot = function(mmu_df1, hsa_df1, sample_1, sample_2, annot_pos_x =
 	dev.off()
 }
 
-
-plot_scan2_ab = function(scan2_fls, samps, ncores = 4, prefix, rand_n = 500000){
-
-	suppressPackageStartupMessages(require(parallel))
-	print('Getting hetSNPs from SCAN2 object')
-
-	tmpL = mclapply(1:length(scan2_fls), mc.cores = ncores, function(x){
-		res = get(load(scan2_fls[x]))
-		resHets = res@gatk[training.site == T,]
-		resHets$Sample = samps[x]
-		resHets = resHets[sample(.N, rand_n)]
-		gc()
-		resHets = resHets[,c('af', 'Sample')]
-		print(x)
-		resHets
-	})
-
-	print('Combine hetSNPs across samples')
-	cmnCols = Reduce(intersect, lapply(tmpL, function(x){colnames(x)}))
-	alldf = lapply(tmpL, function(x){x[, ..cmnCols]}) %>% do.call(rbind, .)
-
-	plt = gghistogram(alldf, x = "af",
-	   add = "mean",
-	   fill = "Sample", rug = F,
-	   add_density = TRUE) +
-	xlab('hetSNP_AF') + ylab('Count') +
-	theme(axis.text.x = element_text(size=20),
-		axis.text.y = element_text(size=20), legend.position = 'right',
-		axis.title = element_text(size=20)) +
-		rotate_x_text(90)
-
-	print('Plotting allelic balance at hetSNPs')
-	pdf(paste0(prefix, '_hetSNPs_AF_SCAN2.pdf'))
-	print( plt )
-	dev.off()
-
-	return(plt)
-}
 
 plot_indel_mutprof = function(mutdf, genome_build, ref_genome,
 				prefix = '', hg = 7, wd = 20, add_chr = F,

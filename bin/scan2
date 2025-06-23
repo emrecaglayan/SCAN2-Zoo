@@ -880,7 +880,7 @@ if __name__ == "__main__":
              'two additional files must be present: an index (.fai) and a '
              'dictionary (.dict).')
     req.add_argument('--genome', type=str,
-        choices=[ 'hs37d5', 'hg38', 'mm10', 'rheMac10', 'panTro6', 'calJac4' ],
+        choices=[ 'hs37d5', 'hg38', 'mm10', 'rheMac10', 'mm39', 'panTro6', 'calJac4' ],
         help='Reference genome to use.  This is not checked against '
              'the provided reference genome or phasing panels, the user '
              'must ensure these match the supplied genome.  It is used '
@@ -889,7 +889,7 @@ if __name__ == "__main__":
              'values must match those recognized by the R SCAN2 package '
              '(see the genome.string.to.bsgenome.object function).')
     req.add_argument('--bsgenome', type=str,
-        choices=[ 'BSgenome.Hsapiens.UCSC.hg19', 'BSgenome.Ptroglodytes.UCSC.panTro6', 'BSgenome.Mmulatta.UCSC.rheMac10', 'BSgenome.Cjacchus.UCSC.calJac4' ],
+        choices=[ 'BSgenome.Hsapiens.UCSC.hg19', 'BSgenome.Ptroglodytes.UCSC.panTro6', 'BSgenome.Mmulatta.UCSC.rheMac10', 'BSgenome.Cjacchus.UCSC.calJac4', 'BSgenome.Mmusculus.UCSC.mm39' ],
         help='Reference genome to use in R')
     
     infiles = config_parser.add_argument_group('Input sequencing data',

@@ -113,13 +113,14 @@ print(paste0('Total indel passes with relaxed balt.lowmq ', nrow(samp_passes_ind
 
 ## GATK - Regenotype new passes, remove if present in bulk ##
 sites = paste0(samp_passes_indel1$chr, ':', samp_passes_indel1$pos, '-', samp_passes_indel1$pos)
-outvcf = paste0(outdir, '/Indel_Regenotype_', samp, '.vcf')
+outvcf_indel = paste0(outdir, '/Indel_Regenotype_', samp, '.vcf')
+outbam_indel = paste0(outdir, '/Indel_Regenotype_', samp, '.bam')
 
 gatk_args <- c(
   "HaplotypeCaller",
   "-R", fastafile,
   "-I", samp_bulk_bam,
-  "-O", outvcf,
+  "-O", outvcf_indel,
   "--minimum-mapping-quality", "0",
   "--max-reads-per-alignment-start", "0",
   "--dont-use-soft-clipped-bases", "true",
@@ -131,12 +132,13 @@ gatk_args <- c(
   "--interval-padding", "100",
   "--min-dangling-branch-length", "0",
   "--allow-non-unique-kmers-in-ref", "true",
+  "--bam-output", outbam_indel,
   unlist(lapply(sites, function(x) c("-L", x)))
 )
 
 # Run the command
 system2("gatk", args = gatk_args)
-indel_regen = read.vcfR(outvcf)
+indel_regen = read.vcfR(outvcf_indel)
 indel_regen_fix = indel_regen@fix
 
 # Check if alt allele is present
@@ -221,13 +223,14 @@ print(paste0('Total snv passes with relaxed balt.lowmq ', nrow(samp_passes_snv1)
 
 ## GATK - Regenotype new passes, remove if present in bulk ##
 sites = paste0(samp_passes_snv1$chr, ':', samp_passes_snv1$pos, '-', samp_passes_snv1$pos)
-outvcf = paste0(outdir, '/Snv_Regenotype_', samp, '.vcf')
+outvcf_snv = paste0(outdir, '/Snv_Regenotype_', samp, '.vcf')
+outvcf_bam = paste0(outdir, '/Snv_Regenotype_', samp, '.bam')
 
 gatk_args <- c(
   "HaplotypeCaller",
   "-R", fastafile,
   "-I", samp_bulk_bam,
-  "-O", outvcf,
+  "-O", outvcf_snv,
   "--minimum-mapping-quality", "0",
   "--max-reads-per-alignment-start", "0",
   "--dont-use-soft-clipped-bases", "true",
@@ -235,15 +238,16 @@ gatk_args <- c(
   "--emit-ref-confidence", "GVCF",
   "--standard-min-confidence-threshold-for-calling", "0",
   "--min-pruning", "0",
-  "--interval-padding", "10",
+  "--interval-padding", "100",
   "--min-dangling-branch-length", "0",
   "--allow-non-unique-kmers-in-ref", "true",
+  "--bam-output", outvcf_bam,
   unlist(lapply(sites, function(x) c("-L", x)))
 )
 
 # Run the command
 system2("gatk", args = gatk_args)
-snv_regen = read.vcfR(outvcf)
+snv_regen = read.vcfR(outvcf_snv)
 snv_regen_fix = snv_regen@fix
 
 # Check if alt allele is present
@@ -253,17 +257,55 @@ filt_bulkgatk_snv = samp_passes_snv1[samp_passes_snv1$id %in% regen_ids,]
 
 
 ## MPILEUP - Regenotype new passes, remove if present in bulk ##
-samp_passes_snv1 = add_mutsigs(mutdf = samp_passes_snv1,
-			bsgenome=bsgenome, gb=gb)
 
+# Remove chr if old human assembly
 if(gb == 'hg19'){
 	samp_passes_snv1$chr = gsub('chr', '', samp_passes_snv1$chr)
 }
 
-snv_bulk_passes = remove_bulk_mpileup(passes_file = samp_passes_snv1,
+
+# Get sites that have realigned
+sites_filt = paste0(samp_passes_snv1$chr, ':', samp_passes_snv1$pos, '-', samp_passes_snv1$pos)
+sites_gr <- GRanges(
+  seqnames = sub(":.*", "", sites_filt),
+  ranges = IRanges(
+    start = as.integer(sub(".*:(\\d+)-\\d+", "\\1", sites_filt)),
+    end = as.integer(sub(".*-([0-9]+)$", "\\1", sites_filt))
+  )
+)
+
+param <- Rsamtools::ScanBamParam(which = sites_gr, what = "pos")
+
+# Read alignments overlapping your positions
+reads <- Rsamtools::scanBam(realign_out_bam, param = param)
+
+# Check which positions had reads
+has_reads <- sapply(reads, function(x) length(x$pos) > 0)
+
+# Filter to only sites with reads
+covered_sites <- sites_filt[has_reads]
+covered_sites = gsub(':|-', '_', covered_sites)
+
+# Separate data frame with realigned sites
+all_sites = paste0(samp_passes_snv1$chr, '_', samp_passes_snv1$pos, '_', samp_passes_snv1$pos)
+samp_passes_snv1_realigned = samp_passes_snv1[all_sites %in% covered_sites,]
+
+
+## MPILEUP - Regenotype new passes, remove if present in bulk ##
+all_mp = remove_bulk_mpileup(passes_file = samp_passes_snv1,
 			bulk_bam_file = samp_bulk_bam,
-			outfile = tempfile(tmpdir = tmpdir, fileext = ".txt"))
-filt_bulkmp_snv = samp_passes_snv1[!(samp_passes_snv1$id %in% snv_bulk_passes$id),]
+			outfile = tmpfile)
+
+samp_passes_snv1_realigned2 = samp_passes_snv1_realigned[samp_passes_snv1_realigned$id %in% all_mp$id,]
+ralign_mp = remove_bulk_mpileup(passes_file = samp_passes_snv1_realigned2,
+			bulk_bam_file = realign_out_bam,
+			outfile = tmpfile)
+
+norealign_pass = all_mp[!(all_mp$id %in% samp_passes_snv1_realigned2$id), id]
+realign_pass = ralign_mp[,id]
+bulk_pass = c(norealign_pass, realign_pass)
+
+filt_bulkmp_snv = samp_passes_snv1[!(samp_passes_snv1$id %in% bulk_pass),]
 
 ## Remove if multiple sSNVs are nearby ##
 filt_cls_snv = find_clustered_snvs(obj = res, inpass = samp_passes_snv1)
@@ -306,14 +348,52 @@ samp_passes_snv2 = samp_passes_snv1[!(samp_passes_snv1$id %in% filters_snv$id),]
 gatk_snv$pass = F
 gatk_snv[id %in% samp_passes_snv2$id, pass := T]
 
-# Recompute the mutation burden
-scan2_obj_newburden = recompute_burden(obj = res,
-				calls_pass_snv = samp_passes_snv2,
-				calls_pass_indel = samp_passes_indel2,
-				cigar_change = T, lysis_change = T,
-				cov_change = F, lysis_thresh = 0.05,
-				cigar_cutoff_fc = 1.5,
-				quantile1 = 0.3, quantile2 = 0.8)
+# Recompute the mutation burden with increasing cigar cutoffs,
+# Could be computed faster with parallelization but it doesn't take long
+# so I will stick with a for loop to keep RAM low
+cutoffs = seq(2, 10, 0.5)
+bL = list()
+for(i in 1:length(cutoffs)){
+	scan2_obj_newburden = recompute_burden(obj = res,
+					calls_pass_snv = samp_passes_snv2,
+					calls_pass_indel = NULL,
+					cigar_change = T, lysis_change = T,
+					cov_change = F, lysis_thresh = 0.05,
+					cigar_cutoff_fc = cutoffs[i],
+					quantile1 = 0.3, quantile2 = 0.8)
+	cigar_burden = scan2_obj_newburden@mutburden$snv[2,]
+	cigar_burden$cigar_cutoff = cutoffs[i]
+	cat('Computed burdens with cigar cutoff: ', cutoffs[i], sep = '')
+	bL[[i]] = cigar_burden
+}
+
+burdens = do.call(rbind, bL)
+burdens = burdens[burdens$callable.sens > 0.3,] # Best to not lose too much sensitivity
+
+dif = burdens[1, 'burden'] - burdens[nrow(burdens), 'burden']
+dif_ratio_increase = dif / burdens[1, 'burden']
+cat('Burden change between first and last cigar cutoff: ', round(dif_ratio_increase*100), '%\n', sep = '')
+
+if(dif_ratio_increase < 0.1){
+	print('Computing burdens with the default cigar cutoff')
+	scan2_obj_newburden = recompute_burden(obj = res,
+					calls_pass_snv = samp_passes_snv2,
+					calls_pass_indel = samp_passes_indel2,
+					cigar_change = T, lysis_change = T,
+					cov_change = F, lysis_thresh = 0.05,
+					cigar_cutoff_fc = cutoffs[1],
+					quantile1 = 0.3, quantile2 = 0.8)
+} else{
+	cigar_cutoff = decide_cigar_cutoff(burdens = burdens, sample_name = samp)
+	scan2_obj_newburden = recompute_burden(obj = res,
+					calls_pass_snv = samp_passes_snv2,
+					calls_pass_indel = samp_passes_indel2,
+					cigar_change = T, lysis_change = T,
+					cov_change = F, lysis_thresh = 0.05,
+					cigar_cutoff_fc = cigar_cutoff,
+					quantile1 = 0.3, quantile2 = 0.8)
+}
+
 
 # Get final passes
 samp_passes_snv_final = scan2_obj_newburden@gatk[scan2_obj_newburden@gatk$pass == T & scan2_obj_newburden@gatk$muttype == 'snv', ]
