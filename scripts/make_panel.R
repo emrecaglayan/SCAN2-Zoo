@@ -66,7 +66,7 @@ read.alts.for.samples <- function(path, region, meta) {
     read.tabix.data(path=path, region=region, header=header,
         colClasses=cols.to.read)
 }
-    
+
 # Counts the number of unique cells and unique donors that support each mutation
 # dmap - a named vector that maps sample ID -> donor ID
 make.panel <- function(df, dmap, bulks) {

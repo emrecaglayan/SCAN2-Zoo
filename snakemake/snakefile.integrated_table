@@ -25,9 +25,9 @@ rule integrate_tables:
         legacy=config['mimic_legacy'],
         config_yaml='scan.yaml',    # quite the hack. would really prefer not to do this
         cross_sample_panel=config['cross_sample_panel']
-    threads: config['integrate_table_n_cores']
+    threads: config['integrate_table_n_cores']*2
     resources:
-        mem=3000*config['integrate_table_n_cores']
+        mem=3000*config['integrate_table_n_cores']*2
     benchmark:
         "call_mutations/benchmark_integrate_tables.txt"
     script:

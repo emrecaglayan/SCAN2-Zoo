@@ -5,10 +5,10 @@ rule refine_passes:
         config_file = config["config_path"],
         scan2_fn = lambda wildcards: config["scan2_objects"][wildcards.sample]
     output:
-        "objects/{sample}_scan2_object_refine.rds"
+        "objects/{sample}/{sample}_scan2_object_refine.rda"
     resources:
-	# Most objects use <15GB but better to request 25GB just in case
-        mem=25000
+	# High mem due to operations on the gatk data
+        mem=48000
     shell:
         """
         {config[scripts]}/refine_passes.R {input.config_file} {input.scan2_fn}

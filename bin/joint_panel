@@ -704,7 +704,7 @@ if __name__ == "__main__":
              'two additional files must be present: an index (.fai) and a '
              'dictionary (.dict).')
     req.add_argument('--genome', type=str,
-       choices=[ 'hs37d5', 'hg38', 'mm10', 'CHM13v2.0', 'rheMac10', 'mm39', 'panTro5', 'calJac4' ],
+       choices=[ 'hs37d5', 'hg38', 'mm10', 'CHM13v2.0', 'rheMac10', 'mm39', 'panTro6', 'calJac4' ],
         help='Reference genome to use.  This is not checked against '
              'the provided reference genome. The user '
              'must ensure these match the supplied genome.  It is used '

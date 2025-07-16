@@ -319,7 +319,6 @@ class Analysis:
             error('no SCAN2 objects were specified (--scan2-object)')
         [ readable_file(r) for r in self.cfg['scan2_objects'].values() ]
 
-
     def check_bams(self, error_on_missing=True):
         if error_on_missing and self.cfg['bulk_bam'] is None:
             error('no bulk BAM was specified (--bulk-bam)')
@@ -914,6 +913,8 @@ if __name__ == "__main__":
             'analysis.  May be specified several times.')
     infiles.add_argument('--scan2-object-file', metavar='FILE',
         help='A text file with paths to .rda files; SAMPLE_ID is inferred from path or filename.')
+    infiles.add_argument('--sc-bams-file', metavar='FILE',
+        help='A text file with paths to scWGA .bam files.')
     
     
 
@@ -1009,10 +1010,10 @@ if __name__ == "__main__":
 
 
     refine = config_parser.add_argument_group("Refine scan2 calls")
-    refine.add_argument('--allpasses', metavar='RDS', type=readable_file,
-        help='All mutation calls before refinement')
-    refine.add_argument('--allartifs', metavar='RDS', type=readable_file,
-        help='All artifacts and mutation calls before refinement')
+#    refine.add_argument('--allpasses', metavar='RDS', type=readable_file,
+#        help='All mutation calls before refinement')
+#    refine.add_argument('--allartifs', metavar='RDS', type=readable_file,
+#        help='All artifacts and mutation calls before refinement')
     refine.add_argument('--indel-fraction-delta', metavar='FLOAT', type=float,
         help='Normalized difference of indels at the site of indel calls between single-cell and bulk.')
 
@@ -1152,7 +1153,9 @@ if __name__ == "__main__":
     # The 'refine' subcommand
 
     refine_parser = subparsers.add_parser('refine',
-        help='Create a list of all passes and artifacts to be used in refine.')
+        help='Refine calls. This step relaxes the cutoff and performs regenotyping of '
+             'all candidates in bulk. It also removes mutations nearby each other and '
+             'applies more stringent cigar and lysis filters.')
     refine_parser.set_defaults(executor=do_refine)
     refine_parser = add_runtime_args(refine_parser)
 

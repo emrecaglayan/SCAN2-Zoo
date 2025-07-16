@@ -1,3 +1,122 @@
+
+get_snv_mpileup_pass = function(samp_passes_snv1, outdir, samp_bulk_bam, tmpdir, tmppref = c('bulkbam', 'snv')){
+
+	# Get sites that have realigned
+	sites_filt = paste0(samp_passes_snv1$chr, ':', samp_passes_snv1$pos, '-', samp_passes_snv1$pos)
+
+	sites_gr <- GRanges(
+	  seqnames = sub(":.*", "", sites_filt),
+	  ranges = IRanges(
+	    start = as.integer(sub(".*:(\\d+)-\\d+", "\\1", sites_filt)),
+	    end = as.integer(sub(".*-([0-9]+)$", "\\1", sites_filt))
+	  )
+	)
+
+	param <- Rsamtools::ScanBamParam(which = sites_gr, what = "pos")
+
+	# Read alignments overlapping your positions
+	outbam = paste0(outdir, '/Regenotype_', tmppref[1], '_', tmppref[2], '_', samp, '.bam')
+	reads <- Rsamtools::scanBam(outbam, param = param)
+
+	# Check which positions had reads
+	has_reads <- sapply(reads, function(x) length(x$pos) > 0)
+
+	# Filter to only sites with reads
+	covered_sites <- sites_filt[has_reads]
+	covered_sites = gsub(':|-', '_', covered_sites)
+
+	# Separate data frame with realigned sites
+	all_sites = paste0(samp_passes_snv1$chr, '_', samp_passes_snv1$pos, '_', samp_passes_snv1$pos)
+	samp_passes_snv1_realigned = samp_passes_snv1[all_sites %in% covered_sites,]
+
+	## MPILEUP - Regenotype new passes, remove if present in bulk ##
+	all_mp = remove_bulk_mpileup(passes_file = samp_passes_snv1,
+				bulk_bam_file = samp_bulk_bam,
+				outfile = tempfile(tmpdir = tmpdir))
+
+	samp_passes_snv1_realigned2 = samp_passes_snv1_realigned[samp_passes_snv1_realigned$id %in% all_mp$id,]
+	ralign_mp = remove_bulk_mpileup(passes_file = samp_passes_snv1_realigned2,
+				bulk_bam_file = outbam,
+				outfile = tempfile(tmpdir = tmpdir))
+
+	norealign_pass = all_mp[!(all_mp$id %in% samp_passes_snv1_realigned2$id), id]
+	realign_pass = ralign_mp[,id]
+	bulk_pass = c(norealign_pass, realign_pass)
+	return(bulk_pass)
+}
+
+regenotype_gatk = function(sites, samp, outdir, fastafile, bamfile, pref){
+
+	outvcf = paste0(outdir, '/Regenotype_', pref[1], '_', pref[2], '_', samp, '.vcf')
+	outbam = paste0(outdir, '/Regenotype_', pref[1], '_', pref[2], '_', samp, '.bam')
+
+	if('indel' %in% pref){
+
+		gatk_args <- c(
+		  "HaplotypeCaller",
+		  "-R", fastafile,
+		  "-I", bamfile,
+		  "-O", outvcf,
+		  "--minimum-mapping-quality", "0",
+		  "--max-reads-per-alignment-start", "0",
+		  "--dont-use-soft-clipped-bases", "true",
+		  "--min-base-quality-score", "0",
+		  "--emit-ref-confidence", "GVCF",
+		  "--standard-min-confidence-threshold-for-calling", "0",
+		  "--pcr-indel-model", "NONE",
+		  "--min-pruning", "0",
+		  "--interval-padding", "500",
+		  "--min-dangling-branch-length", "0",
+		  "--allow-non-unique-kmers-in-ref", "true",
+		  "--bam-output", outbam,
+		  unlist(lapply(sites, function(x) c("-L", x)))
+		)
+
+		# Run the command
+		system2("gatk", args = gatk_args)
+		indel_regen = read.vcfR(outvcf)
+		indel_regen_fix = indel_regen@fix
+
+		# Check if alt allele is present
+		alts = strsplit(indel_regen_fix[, 'ALT'], ',')
+
+		regen_ids = lapply(1:length(alts), function(k){paste(indel_regen_fix[k, 'CHROM'],
+				indel_regen_fix[k, 'POS'], indel_regen_fix[k, 'REF'], alts[[k]], sep = '_')}) %>% unlist
+	} else if('snv' %in% pref){
+
+		gatk_args <- c(
+		  "HaplotypeCaller",
+		  "-R", fastafile,
+		  "-I", bamfile,
+		  "-O", outvcf,
+		  "--minimum-mapping-quality", "0",
+		  "--max-reads-per-alignment-start", "0",
+		  "--dont-use-soft-clipped-bases", "true",
+		  "--min-base-quality-score", "0",
+		  "--emit-ref-confidence", "GVCF",
+		  "--standard-min-confidence-threshold-for-calling", "0",
+		  "--min-pruning", "0",
+		  "--interval-padding", "100",
+		  "--min-dangling-branch-length", "0",
+		  "--allow-non-unique-kmers-in-ref", "true",
+		  "--bam-output", outbam,
+		  unlist(lapply(sites, function(x) c("-L", x)))
+		)
+
+		# Run the command
+		system2("gatk", args = gatk_args)
+		indel_regen = read.vcfR(outvcf)
+		indel_regen_fix = indel_regen@fix
+
+		# Check if alt allele is present
+		alts = strsplit(indel_regen_fix[, 'ALT'], ',')
+
+		regen_ids = lapply(1:length(alts), function(k){paste(indel_regen_fix[k, 'CHROM'],
+				indel_regen_fix[k, 'POS'], indel_regen_fix[k, 'REF'], alts[[k]], sep = '_')}) %>% unlist
+	}
+	return(regen_ids)
+}
+
 decide_cigar_cutoff = function(burdens, sample_name, slope_threshold = -0.3, loess_span = 0.75){
 
 	# This function only accepts a data frame of burdens with varying cigar cutoffs
@@ -180,7 +299,7 @@ recompute_burden = function(obj, calls_pass_snv, calls_pass_indel, cigar_change 
 	old_mb = obj@mutburden
 
 	obj = compute_mutburden_new(object = obj,
-				gbp.per.genome = get.gbp.by.genome(obj),
+				gbp.per.genome = scanZooTrial1::get.gbp.by.genome(obj),
 				quiet = F, q1 = quantile1, q2 = quantile2)
 
 	return(obj)
@@ -298,7 +417,9 @@ scan2_to_lenient_pass = function(scan2_files, samps, ncores = 2, lysis_cutoff = 
 			gatk$Sample = samps[x]
 			gc()
 			print(paste0('Loaded cell ', x))
-			gatk[static.filter == TRUE & lysis.fdr < lysis_cutoff & abc.test == TRUE]
+			gatk[cigar.id.test & cigar.hs.test & dp.test &
+				abc.test & min.sc.alt.test & bulk.gt == '0/0' &
+				csf.test & balt.lowmq <= 2 & lysis.fdr < lysis_cutoff & abc.test == TRUE]
 	})
 
 	cmnCols = Reduce(intersect, lapply(gatkLysisL, function(x){colnames(x)}))

@@ -41,7 +41,7 @@ if config['analysis'] == 'refine':
     include: "snakefile.refine"
     rule base_refine_passes:
         input:
-            expand("objects/{sample}_scan2_object_refine.rds", sample=config["scan2_objects"].keys())
+            expand("objects/{sample}/{sample}_scan2_object_refine.rda", sample=config["scan2_objects"].keys())
 
 
 

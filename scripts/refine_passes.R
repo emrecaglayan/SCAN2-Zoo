@@ -33,8 +33,8 @@ bsgenome = config$bsgenome
 fastafile = config$ref
 id_frac = config$indel_fraction_delta
 metafile = config$makepanel_metadata
-allpasses_fn = config$allpasses
-allartifs_fn = config$allartifs
+#allpasses_fn = config$allpasses
+#allartifs_fn = config$allartifs
 
 
 if(gb == 'hs37d5'){
@@ -64,23 +64,28 @@ source(scripts)
 ####
 
 # Derived variables
-allpasses = readRDS(allpasses_fn)
-pass_artif = readRDS(allartifs_fn)
+#allpasses = readRDS(allpasses_fn)
+#pass_artif = readRDS(allartifs_fn)
 meta = read.csv(metafile)
 
-outdir = 'objects'
-dir.create(outdir, showWarnings=F)
+dir.create('objects', showWarnings=F)
 
 tmpdir = 'tmpdir'
 dir.create(tmpdir, showWarnings=F)
 
 # Adjustments
-allpasses$id = paste0(allpasses$chr, '_', allpasses$pos, '_', allpasses$refnt, '_', allpasses$altnt)
+#allpasses$id = paste0(allpasses$chr, '_', allpasses$pos, '_', allpasses$refnt, '_', allpasses$altnt)
 
 # Load gatk
 res = get(load(scan2_fn))
 gatk = res@gatk
+
+# Add new metric to gatk and save back in the object
+gatk$sc_id_frac = (gatk$ID.cigars/gatk$dp.cigars) - (gatk$ID.cigars.bulk/gatk$dp.cigars.bulk)
+gatk$sc_id_frac_afNorm = gatk$sc_id_frac / gatk$af
 gatk$id = paste(gatk$chr, gatk$pos, gatk$refnt, gatk$altnt, sep = '_')
+res@gatk = gatk
+
 gatk_indel = gatk[gatk$muttype == 'indel',]
 gatk_snv = gatk[gatk$muttype == 'snv',]
 
@@ -88,13 +93,13 @@ rm(gatk)
 gc()
 
 # Load all passes and artifacts
-pass_artif_snv = pass_artif[pass_artif$muttype == 'snv']
-pass_artif_indel = pass_artif[pass_artif$muttype == 'indel']
-allpasses_snv = allpasses[allpasses$muttype == 'snv']
-allpasses_indel = allpasses[allpasses$muttype == 'indel']
+#pass_artif_snv = pass_artif[pass_artif$muttype == 'snv']
+#pass_artif_indel = pass_artif[pass_artif$muttype == 'indel']
+#allpasses_snv = allpasses[allpasses$muttype == 'snv']
+#allpasses_indel = allpasses[allpasses$muttype == 'indel']
 
-rm(pass_artif, allpasses)
-gc()
+#rm(pass_artif, allpasses)
+#gc()
 
 ####
 ## INDELS
@@ -102,102 +107,127 @@ gc()
 
 ## Remove if in bulk ##
 samp = basename(dirname(scan2_fn))
+outdir = paste0('objects/', samp)
+dir.create(outdir, showWarnings = F)
+
 print(paste0('Processing sample for indel ', samp))
 
-## Add the ones that are in the bulk up to 3 reads ##
+## Add the ones that are in the bulk up to 2 reads ##
 samp_passes_indel1 = gatk_indel[cigar.id.test & cigar.hs.test & dp.test &
 	abc.test & min.sc.alt.test & csf.test & bulk.gt == '0/0' &
-	mda.fdr < 0.01 & lysis.fdr < 0.01 & csf.test & balt.lowmq <= 2,]
+	mda.fdr < 0.01 & lysis.fdr < 0.01 & (balt.lowmq <= 2 | balt <= 2),]
 print(paste0('Total indel passes ', sum(gatk_indel$pass)))
 print(paste0('Total indel passes with relaxed balt.lowmq ', nrow(samp_passes_indel1)))
 
-## GATK - Regenotype new passes, remove if present in bulk ##
-sites = paste0(samp_passes_indel1$chr, ':', samp_passes_indel1$pos, '-', samp_passes_indel1$pos)
-outvcf_indel = paste0(outdir, '/Indel_Regenotype_', samp, '.vcf')
-outbam_indel = paste0(outdir, '/Indel_Regenotype_', samp, '.bam')
 
-gatk_args <- c(
-  "HaplotypeCaller",
-  "-R", fastafile,
-  "-I", samp_bulk_bam,
-  "-O", outvcf_indel,
-  "--minimum-mapping-quality", "0",
-  "--max-reads-per-alignment-start", "0",
-  "--dont-use-soft-clipped-bases", "true",
-  "--min-base-quality-score", "0",
-  "--emit-ref-confidence", "GVCF",
-  "--standard-min-confidence-threshold-for-calling", "0",
-  "--pcr-indel-model", "NONE",
-  "--min-pruning", "0",
-  "--interval-padding", "100",
-  "--min-dangling-branch-length", "0",
-  "--allow-non-unique-kmers-in-ref", "true",
-  "--bam-output", outbam_indel,
-  unlist(lapply(sites, function(x) c("-L", x)))
-)
-
-# Run the command
-system2("gatk", args = gatk_args)
-indel_regen = read.vcfR(outvcf_indel)
-indel_regen_fix = indel_regen@fix
-
-# Check if alt allele is present
-alts = strsplit(indel_regen_fix[, 'ALT'], ',')
-
-regen_ids = lapply(1:length(alts), function(k){paste(indel_regen_fix[k, 'CHROM'], indel_regen_fix[k, 'POS'], indel_regen_fix[k, 'REF'], alts[[k]], sep = '_')}) %>% unlist
-
-filt_bulkgatk_indel = samp_passes_indel1[samp_passes_indel1$id %in% regen_ids,]
-
-## Remove calls in sites with many indels and clippings ##
-gatk_indel$sc_id_frac = (gatk_indel$ID.cigars/gatk_indel$dp.cigars) - (gatk_indel$ID.cigars.bulk/gatk_indel$dp.cigars.bulk)
-gatk_indel$sc_id_frac_afNorm = gatk_indel$sc_id_frac / gatk_indel$af
-indel_cigarpass = gatk_indel[sc_id_frac_afNorm > id_frac, id]
-
-filt_morebulk_indel = samp_passes_indel1[!(samp_passes_indel1$id %in% indel_cigarpass),]
-
-
-## Remove if multiple indels are nearby ##
-filt_cls_indel = find_clustered_snvs(obj = res, inpass = samp_passes_indel1)
-
-
-## Remove if recurrent, even if filtered as a pre-amplification artifact ##
-# Check if any two cells share unusually high number of mutations
-subj = meta[meta$sample == samp, 'donor']
-freq = allpasses_indel[allpasses_indel$donor == subj, 'id'] %>% table
-freq_two = names(freq[freq == 2])
-freq_two_cnts = allpasses_indel[allpasses_indel$id %in% freq_two, 'Sample'] %>%
-			table %>% sort(., decreasing = T)
-shared_ratio = (min(freq_two_cnts[1:2]) - freq_two_cnts[3]) / sum(na.omit(gatk_indel$pass))
-shared_ratio = ifelse(is.na(shared_ratio), 0, shared_ratio)
-
-# If very few sSNVs are recurring, filter any recurrent sSNVs
-# If many sSNVs are recurring between two samples, only filter other recurrent sSNVs
-if(shared_ratio < 0.2){
-	pass_artif_other = pass_artif_indel[pass_artif_indel$Sample != samp & pass_artif_indel$pass == F, ]
-	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
-	recurrent_artif = names(which(table(pass_artif_other$id) >= 1))
+if(nrow(samp_passes_indel1) == 0){
+	print('No indels found, skipping indel regenotyping...')
+	print('Setting the indel variables to empty data table to avoid errors')
+	samp_passes_indel2 = samp_passes_indel1
+	filters_indel = samp_passes_indel1
+	filt_bulkgatk_indel = samp_passes_indel1
+	filt_cls_indel = samp_passes_indel1
+	filt_morebulk_indel = samp_passes_indel1
 } else{
-	other_sample = setdiff(names(freq_two_cnts[1:2]), samp)
-	pass_artif_other = pass_artif_indel[!(pass_artif_indel$Sample %in% c(samp, other_sample))
-					& pass_artif_indel$pass == F, ]
-	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
-	recurrent_artif1 = names(which(table(pass_artif_other$id) >= 1))
 
-	pass_artif_other = pass_artif_indel[pass_artif_indel$Sample != samp &
-				pass_artif_indel$pass == F, ]
-	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
-	recurrent_artif2 = names(which(table(pass_artif_other$id) >= 2))
 
-	recurrent_artif = union(recurrent_artif1, recurrent_artif2)
+	## GATK - Regenotype new passes, remove if present in bulk ##
+	sites = paste0(samp_passes_indel1$chr, ':', samp_passes_indel1$pos, '-', samp_passes_indel1$pos)
+	outvcf_indel = paste0(outdir, '/Indel_Regenotype_', samp, '.vcf')
+	outbam_indel = paste0(outdir, '/Indel_Regenotype_', samp, '.bam')
+
+	gatk_args <- c(
+	  "HaplotypeCaller",
+	  "-R", fastafile,
+	  "-I", samp_bulk_bam,
+	  "-O", outvcf_indel,
+	  "--minimum-mapping-quality", "0",
+	  "--max-reads-per-alignment-start", "0",
+	  "--dont-use-soft-clipped-bases", "true",
+	  "--min-base-quality-score", "0",
+	  "--emit-ref-confidence", "GVCF",
+	  "--standard-min-confidence-threshold-for-calling", "0",
+	  "--pcr-indel-model", "NONE",
+	  "--min-pruning", "0",
+	  "--interval-padding", "100",
+	  "--min-dangling-branch-length", "0",
+	  "--allow-non-unique-kmers-in-ref", "true",
+	  "--bam-output", outbam_indel,
+	  unlist(lapply(sites, function(x) c("-L", x)))
+	)
+
+	# Run the command
+	system2("gatk", args = gatk_args)
+	indel_regen = read.vcfR(outvcf_indel)
+	indel_regen_fix = indel_regen@fix
+
+	# Check if alt allele is present
+	alts = strsplit(indel_regen_fix[, 'ALT'], ',')
+
+	regen_ids = lapply(1:length(alts), function(k){paste(indel_regen_fix[k, 'CHROM'], indel_regen_fix[k, 'POS'], indel_regen_fix[k, 'REF'], alts[[k]], sep = '_')}) %>% unlist
+
+	filt_bulkgatk_indel = samp_passes_indel1[samp_passes_indel1$id %in% regen_ids,]
+
+	## Remove calls in sites with many indels and clippings ##
+	# This filter essentially removes indel calls that have many indels in both single-cell and bulk
+	# before local realignment. So these are the indel calls that remain specific to single-cell after
+	# the local realignment. While these may be true calls, the indels are usually not common indel types
+	# as they are large deletions of repetitive regions. So I have decided to remove them with this filter.
+
+	#gatk_indel$sc_id_frac = (gatk_indel$ID.cigars/gatk_indel$dp.cigars) - (gatk_indel$ID.cigars.bulk/gatk_indel$dp.cigars.bulk)
+	#gatk_indel$sc_id_frac_afNorm = gatk_indel$sc_id_frac / gatk_indel$af
+	#gatk_indel$bulk_idf = gatk_indel$ID.cigars.bulk/gatk_indel$dp.cigars.bulk
+
+	indel_cigarpass = gatk_indel[sc_id_frac_afNorm > id_frac, id]
+	filt_morebulk_indel = samp_passes_indel1[!(samp_passes_indel1$id %in% indel_cigarpass),]
+
+
+	## Remove if multiple indels are nearby ##
+	filt_cls_indel = find_clustered_snvs(obj = res, inpass = samp_passes_indel1)
+
+
+	## Remove if recurrent, even if filtered as a pre-amplification artifact ##
+	# Check if any two cells share unusually high number of mutations
+	#subj = meta[meta$sample == samp, 'donor']
+	#freq = allpasses_indel[allpasses_indel$donor == subj, 'id'] %>% table
+	#freq_two = names(freq[freq == 2])
+	#freq_two_cnts = allpasses_indel[allpasses_indel$id %in% freq_two, 'Sample'] %>%
+	#			table %>% sort(., decreasing = T)
+	#shared_ratio = (min(freq_two_cnts[1:2]) - freq_two_cnts[3]) / sum(na.omit(gatk_indel$pass))
+	#shared_ratio = ifelse(is.na(shared_ratio), 0, shared_ratio)
+
+	# If very few sSNVs are recurring, filter any recurrent sSNVs
+	# If many sSNVs are recurring between two samples, only filter other recurrent sSNVs
+	#if(shared_ratio < 0.2){
+	#	pass_artif_other = pass_artif_indel[pass_artif_indel$Sample != samp & pass_artif_indel$pass == F, ]
+	#	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
+	#	recurrent_artif = names(which(table(pass_artif_other$id) >= 1))
+	#} else{
+	#	other_sample = setdiff(names(freq_two_cnts[1:2]), samp)
+	#	pass_artif_other = pass_artif_indel[!(pass_artif_indel$Sample %in% c(samp, other_sample))
+	#					& pass_artif_indel$pass == F, ]
+	#	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
+	#	recurrent_artif1 = names(which(table(pass_artif_other$id) >= 1))
+	#
+	#	pass_artif_other = pass_artif_indel[pass_artif_indel$Sample != samp &
+	#				pass_artif_indel$pass == F, ]
+	#	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
+	#	recurrent_artif2 = names(which(table(pass_artif_other$id) >= 2))
+	#
+	#	recurrent_artif = union(recurrent_artif1, recurrent_artif2)
+	#}
+	#
+	#filt_recur_indel = samp_passes_indel1[samp_passes_indel1$id %in% recurrent_artif,]
+
+	# Assign passes
+	#filters_indel = do.call(rbind, list(filt_bulkgatk_indel, filt_morebulk_indel, filt_cls_indel, filt_recur_indel))
+
+	filters_indel = do.call(rbind, list(filt_bulkgatk_indel, filt_morebulk_indel, filt_cls_indel))
+	samp_passes_indel2 = samp_passes_indel1[!(samp_passes_indel1$id %in% filters_indel$id),]
+	gatk_indel$pass = F
+	gatk_indel[id %in% samp_passes_indel2$id, pass := T]
 }
 
-filt_recur_indel = samp_passes_indel1[samp_passes_indel1$id %in% recurrent_artif,]
-
-# Assign passes
-filters_indel = do.call(rbind, list(filt_bulkgatk_indel, filt_morebulk_indel, filt_cls_indel, filt_recur_indel))
-samp_passes_indel2 = samp_passes_indel1[!(samp_passes_indel1$id %in% filters_indel$id),]
-gatk_indel$pass = F
-gatk_indel[id %in% samp_passes_indel2$id, pass := T]
 
 ####
 ## SNVs
@@ -208,11 +238,7 @@ print(paste0('Processing sample for sSNV ', samp))
 ## Add the ones that are in the bulk up to 2 reads ##
 samp_passes_snv1 = gatk_snv[cigar.id.test & cigar.hs.test & dp.test &
 	abc.test & min.sc.alt.test & csf.test & bulk.gt == '0/0' &
-	mda.fdr < 0.01 & lysis.fdr < 0.01 & csf.test & balt.lowmq <= 2,]
-
-samp_passes_snv1 = add_mutsigs(mutdf = samp_passes_snv1,
-			bsgenome=bsgenome,
-			gb=gb)
+	mda.fdr < 0.01 & lysis.fdr < 0.01 & (balt.lowmq <= 2 | balt <= 2),]
 
 if(gb == 'hg19'){
 	samp_passes_snv1$chr = gsub('chr', '', samp_passes_snv1$chr)
@@ -257,6 +283,8 @@ filt_bulkgatk_snv = samp_passes_snv1[samp_passes_snv1$id %in% regen_ids,]
 
 
 ## MPILEUP - Regenotype new passes, remove if present in bulk ##
+# This filter will remove a sSNV call if at least one alt-allele supporting read is present in bulk
+# either before or after local realignment of the sSNV sites in bulk
 
 # Remove chr if old human assembly
 if(gb == 'hg19'){
@@ -277,7 +305,7 @@ sites_gr <- GRanges(
 param <- Rsamtools::ScanBamParam(which = sites_gr, what = "pos")
 
 # Read alignments overlapping your positions
-reads <- Rsamtools::scanBam(realign_out_bam, param = param)
+reads <- Rsamtools::scanBam(outvcf_bam, param = param)
 
 # Check which positions had reads
 has_reads <- sapply(reads, function(x) length(x$pos) > 0)
@@ -294,12 +322,12 @@ samp_passes_snv1_realigned = samp_passes_snv1[all_sites %in% covered_sites,]
 ## MPILEUP - Regenotype new passes, remove if present in bulk ##
 all_mp = remove_bulk_mpileup(passes_file = samp_passes_snv1,
 			bulk_bam_file = samp_bulk_bam,
-			outfile = tmpfile)
+			outfile = tempfile(tmpdir = tmpdir))
 
 samp_passes_snv1_realigned2 = samp_passes_snv1_realigned[samp_passes_snv1_realigned$id %in% all_mp$id,]
 ralign_mp = remove_bulk_mpileup(passes_file = samp_passes_snv1_realigned2,
-			bulk_bam_file = realign_out_bam,
-			outfile = tmpfile)
+			bulk_bam_file = outvcf_bam,
+			outfile = tempfile(tmpdir = tmpdir))
 
 norealign_pass = all_mp[!(all_mp$id %in% samp_passes_snv1_realigned2$id), id]
 realign_pass = ralign_mp[,id]
@@ -312,38 +340,40 @@ filt_cls_snv = find_clustered_snvs(obj = res, inpass = samp_passes_snv1)
 
 ## Remove if recurrent, even if filtered as a pre-amplification artifact ##
 # Check if any two cells share unusually high number of mutations
-subj = meta[meta$sample == samp, 'donor']
-freq = allpasses_snv[allpasses_snv$donor == subj, 'id'] %>% table
-freq_two = names(freq[freq == 2])
-freq_two_cnts = allpasses_snv[allpasses_snv$id %in% freq_two, 'Sample'] %>%
-			table %>% sort(., decreasing = T)
-shared_ratio = (min(freq_two_cnts[1:2]) - freq_two_cnts[3]) / sum(na.omit(gatk_snv$pass))
-shared_ratio = ifelse(is.na(shared_ratio), 0, shared_ratio)
+#subj = meta[meta$sample == samp, 'donor']
+#freq = allpasses_snv[allpasses_snv$donor == subj, 'id'] %>% table
+#freq_two = names(freq[freq == 2])
+#freq_two_cnts = allpasses_snv[allpasses_snv$id %in% freq_two, 'Sample'] %>%
+#			table %>% sort(., decreasing = T)
+#shared_ratio = (min(freq_two_cnts[1:2]) - freq_two_cnts[3]) / sum(na.omit(gatk_snv$pass))
+#shared_ratio = ifelse(is.na(shared_ratio), 0, shared_ratio)
 
 # If very few sSNVs are recurring, filter any recurrent sSNVs
 # If many sSNVs are recurring between two samples, only filter other recurrent sSNVs
-if(shared_ratio < 0.2){
-	pass_artif_other = pass_artif_snv[pass_artif_snv$Sample != samp & pass_artif_snv$pass == F, ]
-	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
-	recurrent_artif = names(which(table(pass_artif_other$id) >= 1))
-} else{
-	other_sample = setdiff(names(freq_two_cnts[1:2]), samp)
-	pass_artif_other = pass_artif_snv[!(pass_artif_snv$Sample %in% c(samp, other_sample))
-					& pass_artif_snv$pass == F, ]
-	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
-	recurrent_artif1 = names(which(table(pass_artif_other$id) >= 1))
+#if(shared_ratio < 0.2){
+#	pass_artif_other = pass_artif_snv[pass_artif_snv$Sample != samp & pass_artif_snv$pass == F, ]
+#	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
+#	recurrent_artif = names(which(table(pass_artif_other$id) >= 1))
+#} else{
+#	other_sample = setdiff(names(freq_two_cnts[1:2]), samp)
+#	pass_artif_other = pass_artif_snv[!(pass_artif_snv$Sample %in% c(samp, other_sample))
+#					& pass_artif_snv$pass == F, ]
+#	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
+#	recurrent_artif1 = names(which(table(pass_artif_other$id) >= 1))
+#
+#	pass_artif_other = pass_artif_snv[pass_artif_snv$Sample != samp & pass_artif_snv$pass == F, ]
+#	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
+#	recurrent_artif2 = names(which(table(pass_artif_other$id) >= 2))
+#
+#	recurrent_artif = union(recurrent_artif1, recurrent_artif2)
+#}
 
-	pass_artif_other = pass_artif_snv[pass_artif_snv$Sample != samp & pass_artif_snv$pass == F, ]
-	pass_artif_other$chr = gsub('chr', '', pass_artif_other$chr)
-	recurrent_artif2 = names(which(table(pass_artif_other$id) >= 2))
-
-	recurrent_artif = union(recurrent_artif1, recurrent_artif2)
-}
-
-filt_recur_snv = samp_passes_snv1[samp_passes_snv1$id %in% recurrent_artif,]
+#filt_recur_snv = samp_passes_snv1[samp_passes_snv1$id %in% recurrent_artif,]
 
 # Assign passes
-filters_snv = do.call(rbind, list(filt_bulkgatk_snv, filt_bulkmp_snv, filt_cls_snv, filt_recur_snv))
+#filters_snv = do.call(rbind, list(filt_bulkgatk_snv, filt_bulkmp_snv, filt_cls_snv, filt_recur_snv))
+
+filters_snv = do.call(rbind, list(filt_bulkgatk_snv, filt_bulkmp_snv, filt_cls_snv))
 samp_passes_snv2 = samp_passes_snv1[!(samp_passes_snv1$id %in% filters_snv$id),]
 gatk_snv$pass = F
 gatk_snv[id %in% samp_passes_snv2$id, pass := T]
@@ -351,48 +381,74 @@ gatk_snv[id %in% samp_passes_snv2$id, pass := T]
 # Recompute the mutation burden with increasing cigar cutoffs,
 # Could be computed faster with parallelization but it doesn't take long
 # so I will stick with a for loop to keep RAM low
-cutoffs = seq(2, 10, 0.5)
-bL = list()
-for(i in 1:length(cutoffs)){
-	scan2_obj_newburden = recompute_burden(obj = res,
-					calls_pass_snv = samp_passes_snv2,
-					calls_pass_indel = NULL,
-					cigar_change = T, lysis_change = T,
-					cov_change = F, lysis_thresh = 0.05,
-					cigar_cutoff_fc = cutoffs[i],
-					quantile1 = 0.3, quantile2 = 0.8)
-	cigar_burden = scan2_obj_newburden@mutburden$snv[2,]
-	cigar_burden$cigar_cutoff = cutoffs[i]
-	cat('Computed burdens with cigar cutoff: ', cutoffs[i], sep = '')
-	bL[[i]] = cigar_burden
-}
+#cutoffs = seq(2, 10, 0.5)
+#bL = list()
+#for(i in 1:length(cutoffs)){
+#	scan2_obj_newburden = recompute_burden(obj = res,
+#					calls_pass_snv = samp_passes_snv2,
+#					calls_pass_indel = NULL,
+#					cigar_change = T, lysis_change = T,
+#					cov_change = F, lysis_thresh = 0.05,
+#					cigar_cutoff_fc = cutoffs[i],
+#					quantile1 = 0.3, quantile2 = 0.8)
+#	cigar_burden = scan2_obj_newburden@mutburden$snv[2,]
+#	cigar_burden$cigar_cutoff = cutoffs[i]
+#	print(paste0('Computed burdens with cigar cutoff: ', cutoffs[i]))
+#	bL[[i]] = cigar_burden
+#}
 
-burdens = do.call(rbind, bL)
-burdens = burdens[burdens$callable.sens > 0.3,] # Best to not lose too much sensitivity
+#burdens = do.call(rbind, bL)
 
-dif = burdens[1, 'burden'] - burdens[nrow(burdens), 'burden']
-dif_ratio_increase = dif / burdens[1, 'burden']
-cat('Burden change between first and last cigar cutoff: ', round(dif_ratio_increase*100), '%\n', sep = '')
+#pdf(paste0(samp, '_cigarX_burdenY.pdf'))
+#print(
+#	ggscatter(burdens, x = 'cigar_cutoff', y = 'burden', add = 'loess', color = 'blue', size = 5) +
+#	xlab('Cigar cutoff stringency') + ylab('Genomewide burden estimate') +
+#	theme(
+#		axis.title = element_text(size = 20),
+#		axis.text = element_text(size = 20)
+#	)
+#)
+#dev.off()
 
-if(dif_ratio_increase < 0.1){
-	print('Computing burdens with the default cigar cutoff')
-	scan2_obj_newburden = recompute_burden(obj = res,
-					calls_pass_snv = samp_passes_snv2,
-					calls_pass_indel = samp_passes_indel2,
-					cigar_change = T, lysis_change = T,
-					cov_change = F, lysis_thresh = 0.05,
-					cigar_cutoff_fc = cutoffs[1],
-					quantile1 = 0.3, quantile2 = 0.8)
-} else{
-	cigar_cutoff = decide_cigar_cutoff(burdens = burdens, sample_name = samp)
-	scan2_obj_newburden = recompute_burden(obj = res,
-					calls_pass_snv = samp_passes_snv2,
-					calls_pass_indel = samp_passes_indel2,
-					cigar_change = T, lysis_change = T,
-					cov_change = F, lysis_thresh = 0.05,
-					cigar_cutoff_fc = cigar_cutoff,
-					quantile1 = 0.3, quantile2 = 0.8)
-}
+
+# Let's go with a modest increase in cigar cutoff as default. But this can be made more stringent
+# if there is a clear trend of burden estimate going down with greater cigar cutoff stringency.
+# If that is the case, it would mean that called mutations are removed more than hetSNPs with increasing
+# cigar cutoffs, indicating that increasing cigar stringency likely removes more false positives.
+scan2_obj_newburden = recompute_burden(obj = res,
+				calls_pass_snv = samp_passes_snv2,
+				calls_pass_indel = samp_passes_indel2,
+				cigar_change = T, lysis_change = T,
+				cov_change = F, lysis_thresh = 0.05,
+				cigar_cutoff_fc = 2,
+				quantile1 = 0.3, quantile2 = 0.8)
+
+
+#burdens = burdens[burdens$callable.sens > 0.3,] # Best to not lose too much sensitivity
+
+#dif = burdens[1, 'burden'] - burdens[nrow(burdens), 'burden']
+#dif_ratio_increase = dif / burdens[1, 'burden']
+#cat('Burden change between first and last cigar cutoff: ', round(dif_ratio_increase*100), '%\n', sep = '')
+
+#if(dif_ratio_increase < 0.1){
+#	print('Computing burdens with the default cigar cutoff')
+#	scan2_obj_newburden = recompute_burden(obj = res,
+#					calls_pass_snv = samp_passes_snv2,
+#					calls_pass_indel = samp_passes_indel2,
+#					cigar_change = T, lysis_change = T,
+#					cov_change = F, lysis_thresh = 0.05,
+#					cigar_cutoff_fc = cutoffs[1],
+#					quantile1 = 0.3, quantile2 = 0.8)
+#} else{
+#	cigar_cutoff = decide_cigar_cutoff(burdens = burdens, sample_name = samp)
+#	scan2_obj_newburden = recompute_burden(obj = res,
+#					calls_pass_snv = samp_passes_snv2,
+#					calls_pass_indel = samp_passes_indel2,
+#					cigar_change = T, lysis_change = T,
+#					cov_change = F, lysis_thresh = 0.05,
+#					cigar_cutoff_fc = cigar_cutoff,
+#					quantile1 = 0.3, quantile2 = 0.8)
+#}
 
 
 # Get final passes
@@ -407,22 +463,20 @@ filt_final_indel = samp_passes_indel2[!(samp_passes_indel2$id %in% samp_passes_i
 # Combine filtered snvs
 if(nrow(filt_bulkgatk_snv) > 0){filt_bulkgatk_snv$reason = 'in_bulk_gatk'}else{filt_bulkgatk_snv = NULL}
 if(nrow(filt_bulkmp_snv) > 0){filt_bulkmp_snv$reason = 'in_bulk_mpileup'}else{filt_bulkmp_snv = NULL}
-if(nrow(filt_recur_snv) > 0){filt_recur_snv$reason = 'recurrent_snv'}else{filt_recur_snv = NULL}
+#if(nrow(filt_recur_snv) > 0){filt_recur_snv$reason = 'recurrent_snv'}else{filt_recur_snv = NULL}
 if(nrow(filt_cls_snv) > 0){filt_cls_snv$reason = 'nearby_other_snvs'}else{filt_cls_snv = NULL}
 if(nrow(filt_final_snv) > 0){filt_final_snv$reason = 'final_threshold'}else{filt_final_snv = NULL}
 
 # Combine filtered indels
 if(nrow(filt_bulkgatk_indel) > 0){filt_bulkgatk_indel$reason = 'in_bulk_gatk'}else{filt_bulkgatk_indel = NULL}
 if(nrow(filt_morebulk_indel) > 0){filt_morebulk_indel$reason = 'more_indels_in_bulk'}else{filt_morebulk_indel = NULL}
-if(nrow(filt_recur_indel) > 0){filt_recur_indel$reason = 'recurrent_indel'}else{filt_recur_indel = NULL}
+#if(nrow(filt_recur_indel) > 0){filt_recur_indel$reason = 'recurrent_indel'}else{filt_recur_indel = NULL}
 if(nrow(filt_cls_indel) > 0){filt_cls_indel$reason = 'nearby_other_indels'}else{filt_cls_indel = NULL}
 if(nrow(filt_final_indel) > 0){filt_final_indel$reason = 'final_threshold'}else{filt_final_indel = NULL}
 
-comb_filt_indel = do.call(rbind, list(filt_bulkgatk_indel, filt_morebulk_indel,
-				filt_recur_indel, filt_cls_indel, filt_final_indel))
+comb_filt_indel = do.call(rbind, list(filt_bulkgatk_indel, filt_morebulk_indel, filt_cls_indel, filt_final_indel))
 
-comb_filt_snv = do.call(rbind, list(filt_bulkgatk_snv, filt_bulkmp_snv, filt_recur_snv,
-				filt_cls_snv, filt_final_snv))
+comb_filt_snv = do.call(rbind, list(filt_bulkgatk_snv, filt_bulkmp_snv, filt_cls_snv, filt_final_snv))
 
 if(!is.null(comb_filt_indel)){
 	comb_filt_indel$Sample = samp
@@ -459,8 +513,9 @@ burden_df = rbind(burden_df_snv, burden_df_indel)
 # Save
 resL = list(burden_df, samp_passes_snv_final, samp_passes_indel_final, comb_filt_snv, comb_filt_indel)
 names(resL) = c('Burden', 'Passes_snv', 'Passes_indel', 'Filtered_snv', 'Filtered_indel')
+#write.table(burdens, row.names = F, quote = F, sep = '\t', paste0(outdir, '/', samp, '_cigar_by_burden.txt'))
 saveRDS(resL, paste0(outdir, '/', samp, '_final_burdens_and_calls.rds'))
-save(scan2_obj_newburden, file = paste0(outdir, '/', samp, '_scan2_object_refine.rds'))
+save(scan2_obj_newburden, file = paste0(outdir, '/', samp, '_scan2_object_refine.rda'))
 
 
 
