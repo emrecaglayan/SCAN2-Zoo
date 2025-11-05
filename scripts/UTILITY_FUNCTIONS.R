@@ -1,4 +1,61 @@
 
+get_nxp_artifacts = function(passes, sc, meta, panel, stringency = 0.5, cnt_alt = 3, bsgenome, gb){
+
+	# Load artifacts
+	passes$id = paste0(passes$chr, '_', passes$pos, '_', passes$refnt, '_', passes$altnt)
+	panel_pos = panel[panel$pos %in% passes$pos,]
+
+	panel_pos_passesL = list()
+	for(i in 1:nrow(panel_pos)){
+		#panel_pos$id = paste0(panel_pos$chr, '_', panel_pos$pos, '_', panel_pos$refnt, '_', panel_pos$altnt)
+		panel_pos_i = panel_pos[i,]	
+		ids = paste0(panel_pos_i[,'chr'], '_', panel_pos_i[,'pos'], '_', panel_pos_i[,'refnt'], '_', unlist(strsplit(panel_pos_i[,altnt], ',')))
+		
+		# Extract artifacts from the panel if an ALT allele is also found in passes
+		if(sum(ids %in% passes$id) >= 1){
+			panel_pos_passesL[[i]] = panel_pos_i
+		} else{
+			panel_pos_passesL[[i]] = NULL
+		}
+	}
+
+	panel_pos = as.data.frame(do.call(rbind, panel_pos_passesL))
+	panel_pos_num = panel_pos[,7:(ncol(panel)-1)]
+
+	
+	meta = read.csv(meta, header = T)
+	
+	if(sc %in% meta$sample){
+
+		# Get donor name
+		donor = meta[meta$sample == sc, 'donor']
+
+		# Exclude samples from the same donor
+		donorS = colnames(panel_pos)[grepl(donor, colnames(panel_pos))]
+		panel_pos_num_others = panel_pos_num[, !(colnames(panel_pos_num) %in% donorS)]
+	} else{
+		panel_pos_num_others = panel_pos_num
+	}
+
+	# Get minimum number of samples that should have the alt allele if it will be filtered
+	sampN = round(ncol(panel_pos_num_others)*stringency)
+
+	# Find number of samples (sc or bulk) with more than X ALT allele at the mutation site
+	tmp = apply(panel_pos_num_others, 1, function(x){y = sum(x >= cnt_alt)})
+
+	# Find the sites that meet the above criteria for at least X percent of the samples, depending on stringency
+	panel_pos$id0 = paste0(panel_pos$chr, '_', panel_pos$pos)
+	passes$id0 = paste0(passes$chr, '_', passes$pos)
+	artifacts = passes[passes$id0 %in% panel_pos[which(tmp > sampN), 'id0'], ]
+	artifacts
+}
+
+
+
+
+
+
+
 get_snv_mpileup_pass = function(samp_passes_snv1, outdir, samp_bulk_bam, tmpdir, tmppref = c('bulkbam', 'snv')){
 
 	# Get sites that have realigned
@@ -45,7 +102,7 @@ get_snv_mpileup_pass = function(samp_passes_snv1, outdir, samp_bulk_bam, tmpdir,
 	return(bulk_pass)
 }
 
-regenotype_gatk = function(sites, samp, outdir, fastafile, bamfile, pref){
+regenotype_gatk = function(intervals_file, samp, outdir, fastafile, bamfile, pref){
 
 	outvcf = paste0(outdir, '/Regenotype_', pref[1], '_', pref[2], '_', samp, '.vcf')
 	outbam = paste0(outdir, '/Regenotype_', pref[1], '_', pref[2], '_', samp, '.bam')
@@ -69,7 +126,7 @@ regenotype_gatk = function(sites, samp, outdir, fastafile, bamfile, pref){
 		  "--min-dangling-branch-length", "0",
 		  "--allow-non-unique-kmers-in-ref", "true",
 		  "--bam-output", outbam,
-		  unlist(lapply(sites, function(x) c("-L", x)))
+		  "-L", intervals_file
 		)
 
 		# Run the command
@@ -100,7 +157,7 @@ regenotype_gatk = function(sites, samp, outdir, fastafile, bamfile, pref){
 		  "--min-dangling-branch-length", "0",
 		  "--allow-non-unique-kmers-in-ref", "true",
 		  "--bam-output", outbam,
-		  unlist(lapply(sites, function(x) c("-L", x)))
+		  "-L", intervals_file
 		)
 
 		# Run the command

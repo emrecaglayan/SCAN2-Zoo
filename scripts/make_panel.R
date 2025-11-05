@@ -88,9 +88,8 @@ make.panel <- function(df, dmap, bulks) {
     })))
     unique.bulks <- rowSums(df[,..bulk.idxs,drop=FALSE] > 0)
 
-    # remove the entry with the maximum support
-    outs <- apply(df[,-..meta.idxs,drop=FALSE], 1, function(row) {
-        r <- row[-which.max(row)]
+    # get the entry with the maximum support (in all samples not from the same subject)
+    outs <- apply(df[,-..meta.idxs,drop=FALSE], 1, function(r) {
         c(max(r), sum(r))
     })
     max.out <- outs[1,]
@@ -122,6 +121,54 @@ names(dmap) <- meta$sample
 cat('Starting integrated table pipeline on', length(grs), 'chunks.\n')
 cat('Parallelizing with', future::nbrOfWorkers(), 'cores.\n')
 
+
+# Panel with donor exclusion
+
+keydonors = unique(dmap)
+
+for(k in 1:length(keydonors)){
+
+	keydonor = keydonors[k]
+        dmap_nokey = dmap[dmap != keydonor]
+        meta_nokey = meta[!(meta$donor %in% keydonor),]
+
+	progressr::with_progress({
+	    handlers(handler_newline())
+	    p <- progressr::progressor(along=1:length(grs))
+	    p(amount=0, class='sticky', scanZooTrial1::perfcheck(print.header=TRUE))
+	    xs <- future.apply::future_lapply(1:length(grs), function(i) {
+		gr <- grs[i,]
+
+		pc <- scanZooTrial1::perfcheck(paste('read.alts.for.samples', i),
+		    tb <- read.alts.for.samples(path=inf, region=gr, meta=meta_nokey))
+		p(class='sticky', amount=0, pc)
+
+		pc <- scanZooTrial1::perfcheck(paste('make.panel', i),
+		    ret <- make.panel(tb, dmap_nokey, meta_nokey[amp=='bulk']$sample))
+		p(class='sticky', amount=0, pc)
+
+		p()
+		ret
+	    })
+	}, enable=TRUE)
+
+	pon <- data.table::rbindlist(xs)
+
+	outf.donor = gsub('panel.tab', paste0('panel_', keydonor, '.tab'), outf)
+	outf.gz.donor = gsub('panel.tab.gz', paste0('panel_', keydonor, '.tab.gz'), outf.gz)
+
+	cat(sprintf("Saving PON to %s..\n", outf.donor))
+	colnames(pon)[1] <- paste0('#', colnames(pon)[1])
+	data.table::fwrite(pon, file=outf.donor, sep='\t', quote=FALSE)
+
+	Rsamtools::bgzip(outf.donor, outf.gz.donor)
+	Rsamtools::indexTabix(file=outf.gz.donor, format='vcf', comment='#')
+	print(paste0('Completed building panel stats for donor ', keydonor))
+}
+
+
+# Panel without donor exclusion
+
 progressr::with_progress({
     handlers(handler_newline())
     p <- progressr::progressor(along=1:length(grs))
@@ -149,3 +196,4 @@ colnames(pon)[1] <- paste0('#', colnames(pon)[1])
 data.table::fwrite(pon, file=outf, sep='\t', quote=FALSE)
 Rsamtools::bgzip(outf, outf.gz)
 Rsamtools::indexTabix(file=outf.gz, format='vcf', comment='#')
+

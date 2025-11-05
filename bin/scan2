@@ -62,6 +62,10 @@ scan2_param_defaults = {
     'makepanel_n_cores': 20,
     'rescue_n_cores': 12,
     'refinepanel_n_cores': 8,
+    'stringency': 0.5,
+    'cnt_alt': 3,
+    'q1': 0.3,
+    'q2': 0.8,
     'resample_M': 20,
     'mimic_legacy': False,
     'bulk_sample': None,
@@ -879,7 +883,7 @@ if __name__ == "__main__":
              'two additional files must be present: an index (.fai) and a '
              'dictionary (.dict).')
     req.add_argument('--genome', type=str,
-        choices=[ 'hs37d5', 'hg38', 'mm10', 'rheMac10', 'mm39', 'panTro6', 'calJac4' ],
+        choices=[ 'hs37d5', 'hg38', 'mm10', 'rheMac10', 'mm39', 'panTro6', 'calJac4', 'musFur1' ],
         help='Reference genome to use.  This is not checked against '
              'the provided reference genome or phasing panels, the user '
              'must ensure these match the supplied genome.  It is used '
@@ -888,7 +892,7 @@ if __name__ == "__main__":
              'values must match those recognized by the R SCAN2 package '
              '(see the genome.string.to.bsgenome.object function).')
     req.add_argument('--bsgenome', type=str,
-        choices=[ 'BSgenome.Hsapiens.UCSC.hg19', 'BSgenome.Ptroglodytes.UCSC.panTro6', 'BSgenome.Mmulatta.UCSC.rheMac10', 'BSgenome.Cjacchus.UCSC.calJac4', 'BSgenome.Mmusculus.UCSC.mm39' ],
+        choices=[ 'BSgenome.Hsapiens.UCSC.hg19', 'BSgenome.Ptroglodytes.UCSC.panTro6', 'BSgenome.Mmulatta.UCSC.rheMac10', 'BSgenome.Cjacchus.UCSC.calJac4', 'BSgenome.Mmusculus.UCSC.mm39','BSgenome.Mfuro.UCSC.musFur1' ],
         help='Reference genome to use in R')
     
     infiles = config_parser.add_argument_group('Input sequencing data',
@@ -1016,7 +1020,14 @@ if __name__ == "__main__":
 #        help='All artifacts and mutation calls before refinement')
     refine.add_argument('--indel-fraction-delta', metavar='FLOAT', type=float,
         help='Normalized difference of indels at the site of indel calls between single-cell and bulk.')
-
+    refine.add_argument('--cnt-alt', metavar='FLOAT', type=float,
+        help='Minimum number of ALT counts needed to flag a mutation as recurrent in another sample.')
+    refine.add_argument('--stringency', metavar='FLOAT', type=float,
+        help='Minimum fraction of samples -decided from the panel from all non-donor samples- needed to flag a mutation as recurrent and remove from final pass.')
+    refine.add_argument('--q1', metavar='FLOAT', type=float,
+        help='Lower quantile for burden estimate.')
+    refine.add_argument('--q2', metavar='FLOAT', type=float,
+        help='Upper quantile for burden estimate.')
 
 
     refine_panel = config_parser.add_argument_group("Panel to refine scan2 calls")

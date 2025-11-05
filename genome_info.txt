@@ -1,0 +1,9 @@
+species	genome_build	total_size	diploid_size	bioc_database
+Homo_sapiens	hs37d5	3137161264	2922500567	BSgenome.Hsapiens.1000genomes.hs37d5
+Homo_sapiens	hg38	3209286105	2996001226	BSgenome.Hsapiens.UCSC.hg38
+Pan_troglodytes	panTro6	2832631814	2654688569	BSgenome.Ptroglodytes.UCSC.panTro6
+Macaca_mulatta	rheMac10	2853992905	2688833735	BSgenome.Mmulatta.UCSC.rheMac10
+Callithrix_jacchus	calJac4	2830217926	2673805149	BSgenome.Cjacchus.UCSC.calJac4
+Mustela_putorius	musFur1	2284322178	2284322178	BSgenome.Mfuro.UCSC.musFur1
+Mus_musculus	mm10	2730871774	2468079478	BSgenome.Mmusculus.UCSC.mm10
+Mus_musculus	mm39	2723431143	2462482285	BSgenome.Mmusculus.UCSC.mm39

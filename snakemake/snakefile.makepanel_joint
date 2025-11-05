@@ -94,7 +94,7 @@ rule process_tab:
         "panel/benchmark_make_panel.txt"
     threads: config['makepanel_n_cores']
     resources:
-        mem=1500*config['makepanel_n_cores']
+        mem=4500*config['makepanel_n_cores']
     shell:
         """
         {config[scripts]}/make_panel.R \
