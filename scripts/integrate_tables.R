@@ -82,9 +82,10 @@ if (is.na(panel))
 y <- yaml::read_yaml(config.yaml)
 sc.samples <- names(y$sc_bams)
 
-# Get all chromosomes that are in the config file. These should all be diploid chromosomes!
+# Get all chromosomes that are in the config file. These should all be diploid chromosomes
 scaffolds = unique(gsub(':.*', '', y$gatk_regions))
 scaffolds = scaffolds[order(as.numeric(gsub("[^0-9]", "", scaffolds)))]
+grs = genome.string.to.tiling(genome, tilewidth = 1e+07, scaffolds = scaffolds)
 
 # Remove the dbsnp column from tables
 mmq60_r = data.table::fread(mmq60)
@@ -112,7 +113,7 @@ results <- make.integrated.table(mmq60.tab=mmq60, mmq1.tab=mmq1, panel=panel,
     snv.max.bulk.af=snv.max.bulk.af,
     indel.max.bulk.alt=indel.max.bulk.alt,
     indel.max.bulk.af=indel.max.bulk.af,
-    genome=genome, scaffolds=scaffolds, legacy=legacy)
+    genome=genome, grs=grs, legacy=legacy)
 
 inttab <- results$gatk
 write.integrated.table(inttab=inttab, out.tab=out.tab, out.tab.gz=out.tab.gz)
