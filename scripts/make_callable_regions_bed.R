@@ -13,6 +13,7 @@ if ('snakemake' %in% ls()) {
             snakemake@input['tab'],
             snakemake@params['sc_sample'],
             snakemake@params['bulk_sample'],
+            snakemake@params['config_yaml'],
             snakemake@params['genome'],
             snakemake@params['min_sc_dp'],
             snakemake@params['min_bulk_dp'],
@@ -34,14 +35,15 @@ if (length(args) < 7) {
 path <- args[1]
 sc.sample <- args[2]
 bulk.sample <- args[3]
-genome <- args[4]
-min.sc.dp <- as.integer(args[5])
-min.bulk.dp <- as.integer(args[6])
-out.bed <- args[7]
+config.yaml <- args[4]
+genome <- args[5]
+min.sc.dp <- as.integer(args[6])
+min.bulk.dp <- as.integer(args[7])
+out.bed <- args[8]
 
 n.cores <- 1
-if (length(args) == 8)
-    n.cores <- as.integer(args[8])
+if (length(args) == 9)
+    n.cores <- as.integer(args[9])
 
 if (file.exists(out.bed))
     stop(paste('output file', out.bed, 'already exists, please delete it first'))
@@ -51,11 +53,15 @@ suppressMessages(library(future))
 suppressMessages(library(progressr))
 plan(multicore, workers=n.cores)
 
+# Get all chromosomes that are in the config file. These should all be diploid chromosomes!
+scaffolds = unique(gsub(':.*', '', y$gatk_regions))
+scaffolds = scaffolds[order(as.numeric(gsub("[^0-9]", "", scaffolds)))]
+
 progressr::with_progress({
     # handler_newline causes alot of printing, but it's log-friendly
     progressr::handlers(progressr::handler_newline())
     results <- make.callable.regions(path=path, sc.sample=sc.sample, bulk.sample=bulk.sample,
-        genome=genome, min.sc.dp=min.sc.dp, min.bulk.dp=min.bulk.dp)
+        genome=genome, min.sc.dp=min.sc.dp, min.bulk.dp=min.bulk.dp, scaffolds=scaffolds)
 }, enable=TRUE)
 
 

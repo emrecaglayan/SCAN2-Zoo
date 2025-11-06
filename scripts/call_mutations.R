@@ -35,8 +35,11 @@ suppressMessages(library(progressr))
 suppressMessages(library(binom))
 plan(multicore, workers=n.cores)
 
+# Get all chromosomes that are in the config file. These should all be diploid chromosomes!
+scaffolds = unique(gsub(':.*', '', y$gatk_regions))
+scaffolds = scaffolds[order(as.numeric(gsub("[^0-9]", "", scaffolds)))]
 
-grs = retry_genome_string_to_tiling(genome.string)
+grs = retry_genome_string_to_tiling(genome = genome.string, scaffolds = scaffolds)
 
 with_progress({
     # handler_newline causes alot of printing, but it's log-friendly
