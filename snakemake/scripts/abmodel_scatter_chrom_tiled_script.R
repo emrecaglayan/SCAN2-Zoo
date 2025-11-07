@@ -37,7 +37,7 @@ sc.sample <- args[3]
 genome <- args[4]
 chrom <- args[5]
 out.rda <- args[6]
-n.tiles <- args[7]
+n.tiles <- as.integer(args[7])
 
 if (length(args) == 8) {
     library(future)
@@ -60,11 +60,11 @@ cat(future::availableCores(), "cores detected by library(future),", n.cores, "re
 plan(multicore, workers=n.cores)
 
 s = make.scan(bulk=bulk.sample, genome=genome, single.cell=sc.sample)
+f = compute.ab.fits(s, path=int.tab.bgz, chroms=chrom, n.tiles=n.tiles)
 
-
-f <- compute.ab.fits(s, path=int.tab.bgz, chroms=chrom, n.tiles=n.tiles)
-
-save(f, file=out.rda)
+if( !(is.null(f[[1]]))){
+    save(f, file=out.rda)
+}
 
 if ('snakemake' %in% ls()) {
     sink()

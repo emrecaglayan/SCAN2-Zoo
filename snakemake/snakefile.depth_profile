@@ -11,7 +11,8 @@ rule depth_profile_region_summarize_per_sample:
     params:
         sc_sample="{sample}",
         bulk_sample=config['bulk_sample'],
-        genome=config['genome']
+        genome=config['genome'],
+        config_yaml='scan.yaml'
     benchmark:
         "depth_profile/benchmark_{sample}_region_summarize.txt"
     resources:
@@ -28,7 +29,7 @@ rule depth_profile_region_summarize_per_sample:
     shell:
         """
         {config[scripts]}/digest_depth.R {input.tab} \
-            {params.sc_sample} {params.bulk_sample} {params.genome} \
+            {params.sc_sample} {params.bulk_sample} {params.genome} {params.config_yaml} \
             {output.rda} {threads}
         """
 
