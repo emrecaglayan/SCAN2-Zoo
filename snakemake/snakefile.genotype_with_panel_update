@@ -11,6 +11,7 @@ rule update_table:
     input:
         inttab="call_mutations/integrated_table.tab.gz",
         panel=config["panel"],
+        regions_file=lambda wildcards: config['regions_file']
     output:
         outtab="call_mutations/integrated_table_update.tab",
         outtabgz="call_mutations/integrated_table_update.tab.gz",
@@ -18,8 +19,7 @@ rule update_table:
     log:
         "call_mutations/integrate_tables_update.log"
     params:
-        genome=config['genome'],
-        config_yaml='scan.yaml',    # quite the hack. would really prefer not to do this
+        genome=config['genome']
     #threads: config['integrate_table_n_cores']
     resources:
         mem=2000*config['integrate_table_n_cores'],
@@ -29,7 +29,7 @@ rule update_table:
     shell:
         """
         {config[scripts]}/panel_filter_sig.R {input.inttab} {output.outtab} \
-		{input.panel} {params.genome} {resources.threads} >& {log}
+		{input.panel} {input.regions_file} {params.genome}  {resources.threads} >& {log}
         """
  
 rule pregenotype:

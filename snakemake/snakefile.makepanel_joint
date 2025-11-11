@@ -83,13 +83,15 @@ rule process_tab:
     input:
         tab="panel/merge_mmq60.tab.gz",
         tabgz="panel/merge_mmq60.tab.gz.tbi",
-        meta=lambda wildcards: config['makepanel_metadata']
+        meta=lambda wildcards: config['makepanel_metadata'],
+        regions_file=lambda wildcards: config['regions_file']
     output:
         tab=temp("panel/panel.tab"),
         tabgz="panel/panel.tab.gz",
         tabix="panel/panel.tab.gz.tbi"
     params:
-        genome=config['genome']
+        genome=config['genome'],
+	gatk_regions=config['gatk_regions']
     benchmark:
         "panel/benchmark_make_panel.txt"
     threads: config['makepanel_n_cores']
@@ -98,7 +100,7 @@ rule process_tab:
     shell:
         """
         {config[scripts]}/make_panel.R \
-            {input.tab} {input.meta} {output.tab} {params.genome} {threads}
+            {input.tab} {input.meta} {input.regions_file} {output.tab} {params.genome} {threads}
         """
 
 

@@ -97,6 +97,7 @@ scan2_file_defaults = {
     'scan2_objects': {},
     'add_muts': None,
     'makepanel_metadata': None,
+    'regions_file': None,
     'permtool_muts': None,
     'permtool_bedtools_genome_file': None,
     'panel_config': None,
@@ -292,10 +293,15 @@ class Analysis:
                 'permtool_matrix_map' :
                     dict([ (sample_id, readable_file(os.path.join(scan2_dir, 'depth_profile', 'joint_depth_matrix.tab.gz'))) for sample_id, scan2_dir in value ]) }
 
-        if key in [ 'regions', 'regions_file' ]:
-            regions = regions_from_string(value) if \
-                key == 'regions' else regions_from_file(value)
-            return Analysis.handle_regions(regions)
+        if key in ['regions', 'regions_file']:
+            regions = regions_from_string(value) if key == 'regions' else regions_from_file(value)
+            # Process regions using Analysis.handle_regions
+            regions_processed = Analysis.handle_regions(regions)
+            # Add the original file path back under a clear name
+            if key == 'regions_file':
+                regions_processed['regions_file'] = value
+            return regions_processed
+
 
         if key == 'abmodel_use_fit':
             # this is a list of tuples
@@ -926,7 +932,7 @@ if __name__ == "__main__":
         'These parameters allow the user to specify which portions of the genome should be genotyped.  By default, all autosomal regions will be analyzed.  Regions MUST be specified in the same order as the reference genome and should not overlap!!  The maximum target region is chrs 1-22 and X.  Non-pseudoautosomal regions (PARs) on chrX may also be analyzed, but male samples may fail due to lack of hSNPs.  Initial GATK calling will be performed on each region in parallel if possible, which can greatly decrease runtime.')
     gatk.add_argument('--regions', metavar="STRING",
         help='A comma separated list of regions in GATK format: chr:start-stop, e.g. 22:30000001-31000000,22:31000001-32000000.  Cannot be specified in addition to --regions-file.')
-    gatk.add_argument('--regions-file', metavar='PATH',
+    gatk.add_argument('--regions-file', metavar='PATH', type=readable_file,
         help='A BED file containing regions to be analyzed.  Cannot be specified in addition to --regions.')
     
     

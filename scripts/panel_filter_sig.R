@@ -1,9 +1,7 @@
 #!/usr/bin/env Rscript
 
 update_integrate_table <- function(
-    tab.path, panel.path, out_tab.path, genome.string,
-    grs=genome.string.to.tiling(genome.string, tilewidth=10e6, group='auto'),
-    quiet=TRUE, report.mem=FALSE){
+    tab.path, panel.path, out_tab.path, genome.string, grs, quiet=TRUE, report.mem=FALSE){
     cat('Starting update rda pipeline on', length(grs), 'chunks.\n')
     cat('Parallelizing with', future::nbrOfWorkers(), 'cores.\n')
 
@@ -38,16 +36,17 @@ update_integrate_table <- function(
 
 args <- commandArgs(trailingOnly=TRUE)
 print(args)
-if (length(args) < 4)
-    stop('update_integrate_table.R in.tab panel.tab.gz out.rda [n.cores]')
+if (length(args) < 5)
+    stop('update_integrate_table.R in.tab out.rda panel.tab.gz regions_file genome [n.cores]')
 in.rda <- args[1]
 out.rda <-args[2]
 panel.path  <- args[3]
-genome <- args[4]
+regions_file <- args[4]
+genome <- args[5]
 
 n.cores <- 1
-if (length(args) == 5)
-    n.cores <- as.integer(args[5])
+if (length(args) == 6)
+    n.cores <- as.integer(args[6])
 
 if (file.exists(out.rda))
     stop(paste('output file', out.rda, 'already exists, please delete it first'))
@@ -57,5 +56,11 @@ library(future)
 library(progressr)
 plan(multicore, workers=n.cores)
 
-update_integrate_table(in.rda, panel.path, out.rda, genome)
+# Get all chromosomes that are in the regions file
+regions = read.table('/home/ch253794/workdir/REFERENCES/GenomicIntervals/musFur1_intervals_for_gatk_diplods_chromosomes.txt')
+scaffolds = unique(regions[,1])
+scaffolds = scaffolds[order(as.numeric(gsub("[^0-9]", "", scaffolds)))]
+grs = genome.string.to.tiling(genome, tilewidth = 1e+07, scaffolds = scaffolds)
+
+update_integrate_table(in.rda, panel.path, out.rda, genome, grs)
 

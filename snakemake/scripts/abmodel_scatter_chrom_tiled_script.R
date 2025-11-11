@@ -62,9 +62,9 @@ plan(multicore, workers=n.cores)
 s = make.scan(bulk=bulk.sample, genome=genome, single.cell=sc.sample)
 f = compute.ab.fits(s, path=int.tab.bgz, chroms=chrom, n.tiles=n.tiles)
 
-if( !(is.null(f[[1]]))){
+#if( !(is.null(f[[1]]))){
     save(f, file=out.rda)
-}
+#}
 
 if ('snakemake' %in% ls()) {
     sink()

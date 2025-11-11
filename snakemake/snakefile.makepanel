@@ -23,7 +23,8 @@ rule process_tab:
     input:
         tab="panel/hc_raw.mmq60.tab.gz",
         tabgz="panel/hc_raw.mmq60.tab.gz.tbi",
-        meta=lambda wildcards: config['makepanel_metadata']
+        meta=lambda wildcards: config['makepanel_metadata'],
+        regions_file=lambda wildcards: config['regions_file']
     output:
         tab=temp("panel/panel.tab"),
         tabgz="panel/panel.tab.gz",
@@ -38,5 +39,5 @@ rule process_tab:
     shell:
         """
         {config[scripts]}/make_panel.R \
-            {input.tab} {input.meta} {output.tab} {params.genome} {threads}
+            {input.tab} {input.meta} {input.regions_file} {output.tab} {params.genome} {threads}
         """

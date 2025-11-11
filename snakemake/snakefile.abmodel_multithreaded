@@ -18,7 +18,7 @@ rule abmodel_gather:
     benchmark:
         "ab_model/{sample}/benchmark_abmodel_gather.txt"
     resources:
-        mem=1000
+        mem=10000
     script:
         "scripts/abmodel_gather_tiled_script.R"
 

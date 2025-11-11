@@ -1,17 +1,19 @@
 #!/usr/bin/env Rscript
 
 args <- commandArgs(trailingOnly=TRUE)
-if (!(length(args) %in% 4:5))
+if (!(length(args) %in% 5:6))
     stop("usage: make_panel.R input.tab.gz metadata.csv output.tab genome [n.cores]")
 
 inf <- args[1]
 metaf <- args[2]
-outf <- args[3]
-genome <- args[4]
+regions_file <- args[3]
+outf <- args[4]
+genome <- args[5]
 n.cores <- 1
-if (length(args) == 5)
-    n.cores <- as.integer(args[5])
+if (length(args) == 6)
+    n.cores <- as.integer(args[6])
 outf.gz <- paste0(outf, '.gz')
+
 
 
 for (outfile in paste0(outf, c('', '.gz', '.gz.tbi'))) {
@@ -111,7 +113,9 @@ print(meta[amp=='bulk']$sample)
 
 # GRanges intervals for chunked pipeline
 genome.seqinfo <- scanZooTrial1::genome.string.to.seqinfo.object(genome)
-grs <- tileGenome(seqlengths=genome.seqinfo[seqlevels(genome.seqinfo)[1:22]],
+regions = read.table('/home/ch253794/workdir/REFERENCES/GenomicIntervals/musFur1_intervals_for_gatk_diplods_chromosomes.txt')
+scaffolds = unique(regions[,1])
+grs <- tileGenome(seqlengths=genome.seqinfo[scaffolds],
                   tilewidth=10e6, cut.last.tile.in.chrom=TRUE)
 
 # map donor <-> sample IDs
