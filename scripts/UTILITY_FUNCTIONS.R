@@ -1,4 +1,23 @@
 
+region_overlap = function(query, subject){
+
+	# Keep only chr, start, end
+	query_simp = query[, c('chr', 'pos')]
+	query_simp$end = query_simp$pos
+	colnames(query_simp) = c('chr', 'start', 'end')
+	homop = homop[, 1:3]
+	colnames(homop) = c('chr', 'start', 'end')
+
+	# Turn into granges
+	query_simp_gr = makeGRangesFromDataFrame(query_simp)
+	homop_gr = makeGRangesFromDataFrame(homop)
+
+	# Overlap and return the overlaps in query
+	hits = findOverlaps(query_simp_gr, homop_gr)
+	return(query[queryHits(hits), ])
+}
+
+
 get_nxp_artifacts = function(passes, sc, meta, panel, stringency = 0.5, cnt_alt = 3, bsgenome, gb){
 
 	# Load artifacts
@@ -49,11 +68,6 @@ get_nxp_artifacts = function(passes, sc, meta, panel, stringency = 0.5, cnt_alt 
 	artifacts = passes[passes$id0 %in% panel_pos[which(tmp > sampN), 'id0'], ]
 	artifacts
 }
-
-
-
-
-
 
 
 get_snv_mpileup_pass = function(samp_passes_snv1, outdir, samp_bulk_bam, tmpdir, tmppref = c('bulkbam', 'snv')){

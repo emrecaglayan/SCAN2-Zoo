@@ -11,7 +11,7 @@ rule update_table:
     input:
         inttab="call_mutations/integrated_table.tab.gz",
         panel=config["panel"],
-        regions_file=lambda wildcards: config['regions_file']
+        regions_file=config['regions_file']
     output:
         outtab="call_mutations/integrated_table_update.tab",
         outtabgz="call_mutations/integrated_table_update.tab.gz",
