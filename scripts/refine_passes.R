@@ -6,7 +6,7 @@ print(commandArgs(trailingOnly = TRUE))
 args <- commandArgs(trailingOnly = TRUE)
 
 if (!(length(args) == 3)){
-    stop("usage: refine_passes.R config.yaml scan2_object_update.rda merge_mmq60.tab.gz")
+    stop("usage: refine_passes.R yaml_fn scan2_fn panel_fn")
 }
 
 # Get from bash
@@ -26,6 +26,8 @@ stringency = config$stringency
 cnt_alt = config$cnt_alt
 q1 = config$q1
 q2 = config$q2
+homop_fn = config$homopolymers
+filter_homop = config$filter_homopolymers
 
 if(gb == 'hs37d5'){
 	gb = 'hg19'
@@ -66,12 +68,28 @@ res = get(load(scan2_fn))
 sc = res@single.cell
 gatk = res@gatk
 
-# Add new metric to gatk and save back in the object
+# Add new metric to gatk
 gatk$sc_id_frac = (gatk$ID.cigars/gatk$dp.cigars) - (gatk$ID.cigars.bulk/gatk$dp.cigars.bulk)
 gatk$sc_id_frac_afNorm = gatk$sc_id_frac / gatk$af
 gatk$id = paste(gatk$chr, gatk$pos, gatk$refnt, gatk$altnt, sep = '_')
 res@gatk = gatk
 
+# Flag homopolymer sites
+# For indels: remove homopolymer sites from hetSNP lists so that the sensitivity calculations are matched to sINDEL filters
+if(filter_homop){
+	homop = read.table(homop_fn)
+	homop_sites = region_overlap(query = gatk, subject = homop)
+	gatk$is_homopolymer = F
+	gatk[gatk$id %in% homop_sites$id, is_homopolymer := T]
+	gatk[is_homopolymer == T & muttype == 'indel', training.site := F]
+	gatk[is_homopolymer == T & muttype == 'indel', training.pass := F]
+	gatk[is_homopolymer == T & muttype == 'indel', resampled.training.site := F]
+}
+
+# Save back in the object
+res@gatk = gatk
+
+# Separate by snv-indel
 gatk_indel = gatk[gatk$muttype == 'indel',]
 gatk_snv = gatk[gatk$muttype == 'snv',]
 
@@ -107,6 +125,7 @@ if(nrow(samp_passes_indel1) == 0){
 	filt_cls_indel = samp_passes_indel1
 	filt_morebulk_indel = samp_passes_indel1
 	filt_bulkcigar = samp_passes_indel1
+	filt_homopolymer = samp_passes_indel1
 } else{
 
 	## GATK - Regenotype new passes, remove if present in bulk ##
@@ -138,7 +157,15 @@ if(nrow(samp_passes_indel1) == 0){
 	# Remove any sites with more than 2 indels in bulk, indicating two fragments of indels
 	filt_bulkcigar = samp_passes_indel1[ID.cigars.bulk > 2,]
 
-	filters_indel = do.call(rbind, list(filt_bulkgatk_indel, filt_morebulk_indel, filt_cls_indel, filt_bulkcigar))
+	# Remove any sINDEL calls within homopolymer regions
+	if(filter_homop){
+		homop = read.table(homop_fn)
+		filt_homopolymer = region_overlap(query = samp_passes_indel1, subject = homop)
+	} else{
+		filt_homopolymer = samp_passes_indel1[0,]
+	}
+
+	filters_indel = do.call(rbind, list(filt_bulkgatk_indel, filt_morebulk_indel, filt_cls_indel, filt_bulkcigar, filt_homopolymer))
 	samp_passes_indel2 = samp_passes_indel1[!(samp_passes_indel1$id %in% filters_indel$id),]
 	gatk_indel$pass = F
 	gatk_indel[id %in% samp_passes_indel2$id, pass := T]
@@ -267,13 +294,14 @@ if(nrow(filt_recurrent) > 0){filt_recurrent$reason = 'recurrent'}else{filt_recur
 if(nrow(filt_final_snv) > 0){filt_final_snv$reason = 'final_threshold'}else{filt_final_snv = NULL}
 
 # Combine filtered indels
+if(nrow(filt_homopolymer) > 0){filt_homopolymer$reason = 'homopolymer_site'}else{filt_homopolymer = NULL}
 if(nrow(filt_bulkgatk_indel) > 0){filt_bulkgatk_indel$reason = 'in_bulk_gatk'}else{filt_bulkgatk_indel = NULL}
 if(nrow(filt_morebulk_indel) > 0){filt_morebulk_indel$reason = 'more_indels_in_bulk'}else{filt_morebulk_indel = NULL}
 if(nrow(filt_bulkcigar) > 0){filt_bulkcigar$reason = 'high_indels_in_bulk'}else{filt_bulkcigar = NULL}
 if(nrow(filt_cls_indel) > 0){filt_cls_indel$reason = 'nearby_other_indels'}else{filt_cls_indel = NULL}
 if(nrow(filt_final_indel) > 0){filt_final_indel$reason = 'final_threshold'}else{filt_final_indel = NULL}
 
-comb_filt_indel = do.call(rbind, list(filt_bulkgatk_indel, filt_morebulk_indel, filt_cls_indel, filt_bulkcigar, filt_final_indel))
+comb_filt_indel = do.call(rbind, list(filt_homopolymer, filt_bulkgatk_indel, filt_morebulk_indel, filt_cls_indel, filt_bulkcigar, filt_final_indel))
 
 comb_filt_snv = do.call(rbind, list(filt_bulkgatk_snv, filt_bulkmp_snv, filt_cls_snv, filt_recurrent, filt_final_snv))
 
