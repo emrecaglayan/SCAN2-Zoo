@@ -58,7 +58,7 @@ plan(multicore, workers=n.cores)
 
 # Get all chromosomes that are in the regions file
 regions = read.table(regions_file)
-scaffolds = unique(regions[,1])
+scaffolds = as.character(unique(regions[,1]))
 scaffolds = scaffolds[order(as.numeric(gsub("[^0-9]", "", scaffolds)))]
 grs = genome.string.to.tiling(genome, tilewidth = 1e+07, scaffolds = scaffolds)
 

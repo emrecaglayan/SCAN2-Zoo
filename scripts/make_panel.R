@@ -113,8 +113,8 @@ print(meta[amp=='bulk']$sample)
 
 # GRanges intervals for chunked pipeline
 genome.seqinfo <- scanZooTrial1::genome.string.to.seqinfo.object(genome)
-regions = read.table('/home/ch253794/workdir/REFERENCES/GenomicIntervals/musFur1_intervals_for_gatk_diplods_chromosomes.txt')
-scaffolds = unique(regions[,1])
+regions = read.table(regions_file)
+scaffolds = as.character(unique(regions[,1]))
 grs <- tileGenome(seqlengths=genome.seqinfo[scaffolds],
                   tilewidth=10e6, cut.last.tile.in.chrom=TRUE)
 
