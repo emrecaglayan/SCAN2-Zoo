@@ -41,7 +41,7 @@ if ('snakemake' %in% ls()) {
 args <- commandArgs(trailingOnly=TRUE)
 
 # Load packages
-suppressMessages(library(scanZooTrial1))
+suppressMessages(library(scan2.zoo))
 suppressMessages(library(yaml))
 suppressMessages(library(future))
 suppressMessages(library(binom))

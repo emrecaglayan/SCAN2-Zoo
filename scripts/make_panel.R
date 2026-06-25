@@ -21,7 +21,7 @@ for (outfile in paste0(outf, c('', '.gz', '.gz.tbi'))) {
         stop(sprintf("output file %s already exists, please delete it first", outf))
 }
 
-library(scanZooTrial1)
+library(scan2.zoo)
 library(Rsamtools)
 library(future)
 library(future.apply)
@@ -112,7 +112,7 @@ cat("Bulks: ")
 print(meta[amp=='bulk']$sample)
 
 # GRanges intervals for chunked pipeline
-genome.seqinfo <- scanZooTrial1::genome.string.to.seqinfo.object(genome)
+genome.seqinfo <- scan2.zoo::genome.string.to.seqinfo.object(genome)
 regions = read.table(regions_file)
 scaffolds = as.character(unique(regions[,1]))
 grs <- tileGenome(seqlengths=genome.seqinfo[scaffolds],
@@ -139,15 +139,15 @@ for(k in 1:length(keydonors)){
 	progressr::with_progress({
 	    handlers(handler_newline())
 	    p <- progressr::progressor(along=1:length(grs))
-	    p(amount=0, class='sticky', scanZooTrial1::perfcheck(print.header=TRUE))
+	    p(amount=0, class='sticky', scan2.zoo::perfcheck(print.header=TRUE))
 	    xs <- future.apply::future_lapply(1:length(grs), function(i) {
 		gr <- grs[i,]
 
-		pc <- scanZooTrial1::perfcheck(paste('read.alts.for.samples', i),
+		pc <- scan2.zoo::perfcheck(paste('read.alts.for.samples', i),
 		    tb <- read.alts.for.samples(path=inf, region=gr, meta=meta_nokey))
 		p(class='sticky', amount=0, pc)
 
-		pc <- scanZooTrial1::perfcheck(paste('make.panel', i),
+		pc <- scan2.zoo::perfcheck(paste('make.panel', i),
 		    ret <- make.panel(tb, dmap_nokey, meta_nokey[amp=='bulk']$sample))
 		p(class='sticky', amount=0, pc)
 
@@ -176,15 +176,15 @@ for(k in 1:length(keydonors)){
 progressr::with_progress({
     handlers(handler_newline())
     p <- progressr::progressor(along=1:length(grs))
-    p(amount=0, class='sticky', scanZooTrial1::perfcheck(print.header=TRUE))
+    p(amount=0, class='sticky', scan2.zoo::perfcheck(print.header=TRUE))
     xs <- future.apply::future_lapply(1:length(grs), function(i) {
         gr <- grs[i,]
 
-        pc <- scanZooTrial1::perfcheck(paste('read.alts.for.samples', i),
+        pc <- scan2.zoo::perfcheck(paste('read.alts.for.samples', i),
             tb <- read.alts.for.samples(path=inf, region=gr, meta=meta))
         p(class='sticky', amount=0, pc)
 
-        pc <- scanZooTrial1::perfcheck(paste('make.panel', i),
+        pc <- scan2.zoo::perfcheck(paste('make.panel', i),
             ret <- make.panel(tb, dmap, meta[amp=='bulk']$sample))
         p(class='sticky', amount=0, pc)
 

@@ -10,7 +10,7 @@ if (file.exists(out.rda))
     stop(paste("output file", out.rda, "already exists, please delete it first"))
 
 
-library(scan2)
+library(scan2.zoo)
 
 load(in.rda)
 

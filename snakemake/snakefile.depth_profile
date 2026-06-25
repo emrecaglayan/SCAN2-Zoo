@@ -24,7 +24,8 @@ rule depth_profile_region_summarize_per_sample:
         # many real world runs. the max. memory used was 1555 MB per thread; did
         # not scale with number of samples in each batch, as expected. give 1800 MB,
         # a little extra headroom.
-        mem=lambda wildcards, input, threads: 1800 * threads
+        mem=lambda wildcards, input, threads: 1800 * threads,
+	runtime=60
     threads: config['digest_depth_n_cores']
     shell:
         """
@@ -45,7 +46,8 @@ rule callable_region_gather:
         "depth_profile/benchmark_joint_depth_matrix.txt"
     threads: 4
     resources:
-        mem=1000
+        mem=1000,
+	runtime=120
     shell:
         """
         (grep '^#' {input[0]} ; cat {input} | grep -v '^#') \
@@ -72,7 +74,8 @@ rule callable_region_scatter:
         "depth_profile/gatk_depthofcoverage/benchmark_depthofcoverage_chunk{gatk_chunk}.txt"
     threads: 1
     resources:
-        mem=6000
+        mem=6000,
+	runtime=120
     shell:
         """
         gatk DepthOfCoverage \

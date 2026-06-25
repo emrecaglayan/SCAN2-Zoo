@@ -1,4 +1,4 @@
-library(scanZooTrial1)
+library(scan2.zoo)
 alim <- c(-7, 2)
 blim <- c(2, 4)
 clim <- c(-7, 2)

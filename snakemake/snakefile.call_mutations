@@ -60,7 +60,8 @@ rule gatkvcf_to_tab:
     benchmark:
         "call_mutations/benchmark_gatkvcf_to_tab_mmq{gatk_mmq}.txt"
     resources:
-        mem=4000
+        mem=4000,
+	runtime=120
     shell:
         "gatk SelectVariants"
         "   --java-options '-Xmx3G -Xms3G'"

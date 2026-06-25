@@ -18,7 +18,8 @@ rule abmodel_gather:
     benchmark:
         "ab_model/{sample}/benchmark_abmodel_gather.txt"
     resources:
-        mem=10000
+        mem=10000,
+	runtime=60
     script:
         "scripts/abmodel_gather_tiled_script.R"
 
@@ -41,6 +42,7 @@ rule abmodel_scatter:
         "ab_model/{sample}/benchmark_abmodel_scatter_{chr}.tsv"
     threads: config['abmodel_n_cores']
     resources:
-        mem=1000*config['abmodel_n_cores']  # 1 GB per core
+        mem=1000*config['abmodel_n_cores'],  # 1 GB per core
+	runtime = 360
     script:
         "scripts/abmodel_scatter_chrom_tiled_script.R"

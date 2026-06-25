@@ -19,7 +19,8 @@ rule pregenotype:
         genome=config['genome']
     resources:
         mem=128000,
-	threads=5
+	threads=5,
+	runtime=480
     benchmark:
         "call_mutations/{sample}/benchmark_pregenotyping.txt"
     shell:
@@ -56,7 +57,8 @@ rule genotype:
 	ncores=config['genotype_n_cores']*2
     resources:
         mem=6000*config['genotype_n_cores']*2,
-        threads=config['genotype_n_cores']*2
+        threads=config['genotype_n_cores']*2,
+        runtime=2880
     benchmark:
         "call_mutations/{sample}/benchmark_genotype.txt"
     shell:

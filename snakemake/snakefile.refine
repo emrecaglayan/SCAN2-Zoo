@@ -4,7 +4,8 @@ rule refine_passes:
     input:
         config_file = config["config_path"],
         scan2_fn = lambda wildcards: config["scan2_objects"][wildcards.sample],
-        panel_fn = config["panel"]
+        panel_fn = config["panel"],
+        panel_stats_fn = config["panel_stats"]
     output:
         "objects/{sample}/{sample}_scan2_object_refine.rda"
     resources:
@@ -12,6 +13,6 @@ rule refine_passes:
         mem=128000
     shell:
         """
-        {config[scripts]}/refine_passes.R {input.config_file} {input.scan2_fn} {input.panel_fn}
+        {config[scripts]}/refine_passes.R {input.config_file} {input.scan2_fn} {input.panel_fn} {input.panel_stats_fn}
         """
 

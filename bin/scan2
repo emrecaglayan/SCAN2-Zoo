@@ -86,7 +86,8 @@ scan2_param_defaults = {
     'permtool_combine_permutations_n_cores': 20,
     'panel': None,
     'homopolymers': None,
-    'filter_homopolymers': None
+    'filter_homopolymers': None,
+    'panel_stats': None
 }
 
 # Unlike params, all files listed here must be readable upon a call
@@ -106,6 +107,7 @@ scan2_file_defaults = {
     'panel': None,
     'homopolymers': None,
     'filter_homopolymers': None,
+    'panel_stats': None,
     'allpasses': None,
     'allartifs': None,
     'gatk_vcf': None
@@ -1028,6 +1030,8 @@ if __name__ == "__main__":
         help='Variant panel')
     refine.add_argument('--homopolymers', metavar='STRING', type=str,
         help='Homopolymers file. Tab-separated file is expected with the following columns: chr, start, end, nucleotide, length')
+    refine.add_argument('--panel-stats', metavar='STRING', type=str,
+        help='Panel file that keeps the statistics for each variant. It should be specific to each subject, excluding the single cells for that subject.')
     refine.add_argument('--filter-homopolymers', action='store_true',
         help='Flag to filter homopolymer regions from the final callset.')
 

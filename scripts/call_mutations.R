@@ -29,7 +29,7 @@ genome.string <- y$genome
 legacy <- y$mimic_legacy
 target.fdr <- y$target_fdr
 
-suppressMessages(library(scanZooTrial1))
+suppressMessages(library(scan2.zoo))
 suppressMessages(library(future))
 suppressMessages(library(progressr))
 suppressMessages(library(binom))

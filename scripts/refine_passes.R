@@ -5,14 +5,15 @@ print(commandArgs(trailingOnly = TRUE))
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (!(length(args) == 3)){
-    stop("usage: refine_passes.R yaml_fn scan2_fn panel_fn")
+if (!(length(args) == 4)){
+    stop("usage: refine_passes.R yaml_fn scan2_fn panel_fn panel_stats_fn")
 }
 
 # Get from bash
 yaml_fn = args[1]
 scan2_fn = args[2]
 panel_fn = args[3]
+panel_stats_fn = args[4]
 
 # Extract from config file
 config = yaml::read_yaml(yaml_fn)
@@ -28,6 +29,7 @@ q1 = config$q1
 q2 = config$q2
 homop_fn = config$homopolymers
 filter_homop = config$filter_homopolymers
+target.fdr = config$target_fdr
 
 if(gb == 'hs37d5'){
 	gb = 'hg19'
@@ -35,7 +37,7 @@ if(gb == 'hs37d5'){
 }
 
 # Load required libraries
-suppressPackageStartupMessages(suppressWarnings(require(scanZooTrial1)))
+suppressPackageStartupMessages(suppressWarnings(require(scan2.zoo)))
 suppressPackageStartupMessages(suppressWarnings(require(dplyr)))
 suppressPackageStartupMessages(suppressWarnings(require(ggpubr)))
 suppressPackageStartupMessages(suppressWarnings(require(parallel)))
@@ -48,11 +50,11 @@ suppressPackageStartupMessages(suppressWarnings(require(vcfR)))
 suppressPackageStartupMessages(suppressWarnings(require(data.table)))
 
 # For now, source the scripts that extract info from scan2 objects
-scripts = paste0(config$scripts, '/UTILITY_FUNCTIONS.R')
-source(scripts)
+#scripts = paste0(config$scripts, '/UTILITY_FUNCTIONS.R')
+#source(scripts)
 
 ####
-## PREPARE FOR RUN
+## COMPUTE RAW INDEL PASSES
 ####
 
 # Derived variables
@@ -66,13 +68,31 @@ dir.create(tmpdir, showWarnings=F)
 # Load gatk
 res = get(load(scan2_fn))
 sc = res@single.cell
-gatk = res@gatk
+
+# Add the panel data from the integrated table
+panel_stats = fread(panel_stats_fn)
+colnames(panel_stats)[1] = 'chr'
+panel_stats[, chr := as.character(chr)]
+
+res@gatk[panel_stats, on=.(chr,pos),
+	c('nalleles', 'unique.donors', 'unique.cells', 'unique.bulks', 'max.out', 'sum.out', 'sum.bulk') :=
+	list(i.nalleles, i.unique.donors, i.unique.cells, i.unique.bulks, i.max.out, i.sum.out, i.sum.bulk)]
+
+# Compute static filters. This adds csf.test that is false for recurrent somatic indel candidates
+res = scan2.zoo::compute.static.filters(res)
+
+# Call the raw indel passes
+res = call.mutations(res, target.fdr = target.fdr)
+
+####
+## PREPARE FOR RUN
+####
 
 # Add new metric to gatk
+gatk = res@gatk
 gatk$sc_id_frac = (gatk$ID.cigars/gatk$dp.cigars) - (gatk$ID.cigars.bulk/gatk$dp.cigars.bulk)
 gatk$sc_id_frac_afNorm = gatk$sc_id_frac / gatk$af
 gatk$id = paste(gatk$chr, gatk$pos, gatk$refnt, gatk$altnt, sep = '_')
-res@gatk = gatk
 
 # Flag homopolymer sites
 # For indels: remove homopolymer sites from hetSNP lists so that the sensitivity calculations are matched to sINDEL filters

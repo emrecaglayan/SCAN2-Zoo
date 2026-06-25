@@ -19,7 +19,7 @@ for (outfile in c(paste0(out.cigars, c('', '.gz', '.tbi')))) {
         stop(paste0('output file ', outfile, ' already exists, please delete it first'))
 }
 
-suppressMessages(library(scanZooTrial1))
+suppressMessages(library(scan2.zoo))
 suppressMessages(library(Rsamtools))
 suppressMessages(library(binom))
 

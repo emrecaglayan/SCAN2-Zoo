@@ -1,4 +1,4 @@
-library(scanZooTrial1)
+library(scan2.zoo)
 
 load(snakemake@input[['gtobject']])
 
