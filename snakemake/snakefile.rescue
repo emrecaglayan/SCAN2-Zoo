@@ -1,5 +1,7 @@
 # vim: syntax=python
 
+# Use it with caution: Rescue is not tested for SCAN2-ZOO
+
 rule mutsig_rescue:
     input:
         rdas=config['scan2_objects'].values()

@@ -1,229 +1,123 @@
-# SCAN2
-Genotyper for **somatic** SNV and indel discovery in PTA-amplified single cells.
+# SCAN2-Zoo
+Genotyper for **somatic** SNV and indel discovery in PTA-amplified single cells
+from any diploid organism.
 
-SCAN2 should not be used for genotyping germline mutations, as it excludes any
-mutation with any read support in matched bulk samples.
+## Important Notes
 
-**IMPORTANT**: SCAN2 should only be applied to diploid autosomes (i.e., human
-autosomes 1-22). Sex chromosomes are currently not supported, but in principle
-SCAN2 is applicable to female X chromosomes.
+SCAN2-Zoo should only be applied to diploid autosomes (i.e., human autosomes 1-22).
+Sex chromosomes are not supported. SCAN2-Zoo has so far been tested on the following
+organisms: human, chimpanzee, rhesus macaque, marmoset, ferret and hybrid mouse
+(BALB/c X C57BL/6).
 
-> **Note**
->
-> The instructions below guide the user through a minimal demo of the
-> SCAN2 tool with the primary goal of checking the installation. For a more
-> detailed walkthrough including cross-sample panel building and mutation
-> signature-based rescue, please [see the wiki](../../wiki).
+SCAN2-Zoo aggressively removes mutations with any supporting read in the matched
+bulk WGS. The idea behind this is to remove any germline variants but this will
+also remove early developmental somatic mutations, especially if the matched bulk
+WGS has high depth (>60X) and is from the same tissue as the single-cell. Therefore
+we do not recommend SCAN2-Zoo for early developmental somatic mutation calling.
 
-## Clonal vs. non-clonal somatic mutation detection
-SCAN2 currently will not call any mutation candidate with **any** supporting
-reads in the matched bulk sample. At standard WGS sequencing depths of 30x,
-this excludes nearly all germline variants, the majority of early
-post-zygotic mutations and, if the matched bulk is from a closely related
-tissue, many lower frequency clonal somatic mutations as well.
-We therefore often refer
-to SCAN2 calls as "non-clonal," although this is only approximately the
-case since clonal mutations with low frequency may also have 0 reads in
-the matched bulk.
-
-It is not necessarily a good
-idea to allow mutations with >0 reads in bulk since it may allow some
-germline heterozygous mutations or relatively rare artifacts (of
-sequencing, alignment, etc.) to be miscalled as somatic mutations. This
-is particularly true in single cells with very low (i.e., <100) somatic
-mutation burden.
-
-This restriction may be removed in the future after further testing.
+SCAN2-Zoo is essentially a modification of SCAN2 that was developed to call
+mutations from human cells. We refer the readers to the original tool
+if they are only interested in calling mutations from human cells:
+<https://github.com/parklab/SCAN2>
 
 
 # License
-SCAN2 is freely available for non-commercial use.
-
-
+SCAN2-Zoo is freely available for non-commercial use.
 
 # Installation
 SCAN2 is distributed as a conda package. Installation requires the conda
 package management tool and a Linux-flavored OS.
 
-**Operating systems tested**
-* GNU/Linux, kernel version 3.10.0, CentOS 7.
-
-
-## Install miniconda
-**IMPORTANT** Ensure that your chosen install prefix has sufficient
-disk space: SCAN2 requires ~15G of disk space to analyze GRCh37 samples and an
-additional ~10G is required for each extra genome.
-
-```
-$ wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-$ bash Miniconda3-latest-Linux-x86_64.sh
-# Accept the license by typing "yes"
-# Choose to run conda init (enter yes a second time during script)
-```
-Log-out and back in to source .bashrc and put conda on $PATH
-
-
-## Install SCAN2
-Create a conda environment for SCAN2 and install necessary packages
+## Install SCAN2-Zoo
+Create a conda environment for SCAN2-Zoo and install necessary packages
 ```
 conda create -n scan2 -c conda-forge -c bioconda -c jluquette -c dranew -c soil scan2
 
 # Once the environment is created, it must be activated every time
-# you wish to use SCAN2.
-conda activate scan2
+# you wish to use SCAN2-Zoo.
+conda activate scan2-zoo
 ```
 
 
-# Download external data dependencies
-SCAN2 has been tested on the NCBI human reference build 37 and hg38.
-
-## Human genome version GRCh37
-The SCAN2 demo requires GRCh37.
-
-### Reference genome files for SigProfilerMatrixGenerator
-SigProfilerMatrixGenerator is used to classify indels into the 83-class indel mutation
-signature format ID83. This classification requires a reference genome to determine
-the sequence context around each indel. The following command shows how to install a
-SigProfilerMatrixGenerator reference genome for GRCh37; GRCh38 is also available. See
-https://github.com/AlexandrovLab/SigProfilerMatrixGenerator for details on other
-genome assemblies and custom assemblies.
-
-**N.B.** this installation step is required even if indels are not analyzed.
-
-**REMEMBER** the scan2 conda environment must be activated (see above) when
-running these commands!
-```
-$ python
-from SigProfilerMatrixGenerator import install as genInstall
-genInstall.install('GRCh37', rsync=False, bash=True)
-quit()
-```
-
-
-### Human reference version GRCh37 with decoy
-Download the human reference genome if needed. The reference genome should match
-the genome used for read alignment.
-```
-wget ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/b37/human_g1k_v37_decoy.fasta.gz
-wget ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/b37/human_g1k_v37_decoy.fasta.fai.gz
-wget ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/b37/human_g1k_v37_decoy.dict.gz
-gunzip *.gz
-```
-
-### dbSNP **common variants**
-dbSNP build 147 (common variants only) was used in the publication. It is critical to use the database of **common variants**; the full dbSNP often intersects with somatic mutations and will cause reduced sensitivity. 
-Instructions for generating the required tribble index are provided at the bottom of this page.
-```
-wget https://ftp.ncbi.nih.gov/snp/pre_build152/organisms/human_9606_b151_GRCh37p13/VCF/common_all_20180423.vcf.gz
-gunzip common_all_20180423.vcf.gz
-# Create Tribble index (see bottom of this page)
-```
-This VCF can be filtered to match build 147 (used in Luquette et al. 2022).
-Each line contains a dbSNPBuildID=XXX tag; simply filter for XXX <= 147.
-
-### SHAPEIT's haplotype reference panel
-```
-wget https://mathgen.stats.ox.ac.uk/impute/1000GP_Phase3.tgz
-wget https://mathgen.stats.ox.ac.uk/impute/1000GP_Phase3_chrX.tgz
-```
-
-Unzip everything and move the chrX SHAPEIT files into the main SHAPEIT
-directory.
-```
-tar xzvf 1000GP_Phase3.tgz
-tar xzvf 1000GP_Phase3_chrX.tgz
-mv genetic_map_chrX_* 1000GP_Phase3_chrX* 1000GP_Phase3
-```
-
-## Human reference version hg38
-To run the SCAN2 demo, you will need the **GRCh37** genome, not GRCh38.
-
-NOTE: GRCh38 alignments use the 'chr' prefix for chromosome names (i.e., chr1,
-chr2, ..., rather than 1, 2, ...).
 
 ### Internal R reference genome
 ```
 conda install -c conda-forge -c bioconda bioconductor-bsgenome.hsapiens.ucsc.hg38
 ```
 
-### SigProfilerMatrixGenerator reference genome
-```
-$ python
-from SigProfilerMatrixGenerator import install as genInstall
-genInstall.install('GRCh38', rsync=False, bash=True)
-quit()
-```
 
-### Human reference version GRCh38
-Download the human reference genome if needed. The reference genome should match
-the genome used for read alignment.
-```
-wget https://storage.googleapis.com/genomics-public-data/resources/broad/hg38/v0/Homo_sapiens_assembly38.fasta
-wget https://storage.googleapis.com/genomics-public-data/resources/broad/hg38/v0/Homo_sapiens_assembly38.fasta.fai
-wget https://storage.googleapis.com/genomics-public-data/resources/broad/hg38/v0/Homo_sapiens_assembly38.dict
-```
+# Overview of SCAN2-Zoo
+SCAN2-Zoo runs in three steps; genotyping, panel building and refinement.
 
-### dbSNP **common variants**
-Instructions for generating the required tribble index are provided at the bottom of this page.
-```
-wget https://ftp.ncbi.nih.gov/snp/pre_build152/organisms/human_9606_b151_GRCh38p7/VCF/common_all_20180418.vcf.gz
-gunzip common_all_20180418.vcf.gz
-# IMPORTANT: add a 'chr' prefix to sites. The dbSNP VCF currently
-# does not contain ##contig=<ID=chrXXX... header lines, so we only need
-# to update sites. This may change in the future.
-sed  -e 's/\(^[^#]\)/chr\1/' common_all_20180418.vcf > common_all_20180418.chrprefix.vcf
-# Create Tribble index (see bottom of this page)
-```
+Genotyping: Genotypes all single-cell and bulk WGS from the same subject
+and gives a scan2 object for each cell that has the genotyping statistics
+for both the single-cell and its matched bulk (object@gatk). This step
+also builds an allelic balance curve based on the maximum VAF of heterozygous
+SNPs and creates statistics to be used in somatic mutation calling. Although
+this step will also call somatic SNVs, the results are not final and
+should not be used.
 
-### Eagle2 phasing panel
-The user must create a reference panel manually for Eagle phasing. SCAN2 provides
-a script (`scan2_download_eagle_refpanel.sh`) to do this, which essentially
-implements the strategy recommended by Eagle2's authors (see
-https://alkesgroup.broadinstitute.org/Eagle/#x1-320005.3.2). The script is located
-in the same directory as the scan2 binary (`which scan2`), but is
-runnable by simply typing the script's name when the scan2 conda environment is
-activated.
-```
-mkdir eagle_1000g_panel
-cd eagle_1000g_panel
+Panel building: Combines genotypes of all single-cell and bulk WGS in the
+entire dataset (i.e all subjects) and gives statistics on all variants to
+be used in refinement.
 
-for chr in {1..22} X; do  
-    scan2_download_eagle_refpanel.sh path/to/Homo_sapiens_assembly38.fasta $chr
-done
-```
+Refinement: Uses additional filters and panel information for final SNV and
+indel calls.
 
-Download Eagle's genmap file:
-```
-wget https://storage.googleapis.com/broad-alkesgroup-public/Eagle/downloads/tables/genetic_map_hg38_withX.txt.gz
-```
+# Minimal SCAN2-Zoo run
+SCAN2-Zoo relies on high converage (>15X) and a panel of cells from
+different subjects for accurate somatic SNV and indel calling. We
+provide a minimal example here for users to test whether the tool
+runs with the expected output files. Somatic mutation calls of this
+tutorial are not accurate. For a more detailed tutorial with
+explanations, please follow our vignette: XYZ
 
-Finally, you must supply the following arguments to `scan2 config` to use Eagle instead of SHAPEIT:
-* `--phaser eagle`
-* `--eagle-refpanel path/to/eagle_1000g_panel` - this should be the directory created by the commands above.
-* `--eagle-genmap /path/to/genetic_map_hg38_withX.txt.gz`
+## Download the BAM files
+This is a glutamatergic neuron from a marmoset sample and its matched
+bulk WGS (aligned to calJac4). Both are subset to ~2X genomic coverage
+and limited to chromosome 20 for tutorial purposes.
+
+wget XYZ
+
+## Download the panel files
+Since building a panel requires multiple samples, here we provide the
+pre-built panel files to enable full run of the third step for tutorial
+purposes.
+
+wget XYZ
+
+## Download the homopolymer regions
+Refinement step removes somatic mutation calls that map to homopolymers
+longer than 5 nucleotides. Here we provide this file for calJac4, please
+see the vignette for generating homopolymer regions from any genome.
+
+wget XYZ
+
+## Generate a regions file
+To parallelize genotyping with gatk, genome is split into a user defined
+number of regions. Here we will use calJac4 chromosome 20 split into 3
+intervals. This can be increased for larger datasets (typically 100-300
+regions for the entire genome).
+
+wget XYZ
+
+# Run SCAN2-Zoo
+
+## Genotyping
+
+scan2-zoo \
+  -d PTA_230 \
+  --snakefile ${SCAN2_dir}/snakemake/Snakefile \
+  config \
+  --gatk gatk4_gvcf \
+  --scripts ${SCAN2_dir}/scripts \
+  --bulk-bam ${BULK} \
+  --sc-bam ${SC1} \
+  --genome 'calJac4' \
+  --ref /home/ch253794/workdir/REFERENCES/BWA_REFERENCES/calJac4/calJac4.fa \
+  --regions-file /home/ch253794/workdir/REFERENCES/GenomicIntervals/calJac4_intervals.txt
 
 
-
-# Running the SCAN2 demo
-## Download the demo chr22 BAMs
-These files are aligned to GRCh37, so one
-must downloaded the GRCh37 external data files as directed above to run
-the demo.
-
-We provide two MDA-amplified (not PTA-amplified!) single cell BAMs and
-one matched bulk from Dong et al. (*Nature Methods* 2017) for the demo.
-These are chosen (rather than our PTA data) because they are publicly
-available on SRA while our PTA cells are only available only through
-protected access at dbGaP.
-
-```
-wget http://compbio.med.harvard.edu/scan-snv/hunamp.chr22.bam
-wget http://compbio.med.harvard.edu/scan-snv/hunamp.chr22.bam.bai
-wget http://compbio.med.harvard.edu/scan-snv/il-11.chr22.bam
-wget http://compbio.med.harvard.edu/scan-snv/il-11.chr22.bam.bai
-wget http://compbio.med.harvard.edu/scan-snv/il-12.chr22.bam
-wget http://compbio.med.harvard.edu/scan-snv/il-12.chr22.bam.bai
-```
 
 ## Run SCAN2
 Replace instances of /path/to/... with the paths
@@ -375,22 +269,3 @@ Snakemake to offer parallelization via any of the following:
 
 See Snakemake's documentation for more details on cluster and cloud execution: https://snakemake.readthedocs.io/en/stable/.
 
-
-# Generating a Tribble index for dbSNP
-dbSNP VCFs must be indexed by Tribble (*not* tabix) for GATK. The dbSNP
-found in the GATK's resource bundle is already indexed. If you wish to use
-a different dbSNP version (as in the above section on downloading external
-data dependencies), use IGVtools as detailed below:
-
-```
-# IMPORTANT! IMPORTANT! Do not install igvtools into your SCAN2 conda
-# environment. Create a new environment for igvtools! At the time of this writing,
-# igvtools depends on an incompatible version of the JDK and will break the
-# GATK installation.
-conda deactivate                               # exit the SCAN2 environment
-conda create -n igvtools -c bioconda igvtools  # create a new environment with only igvtools installed
-conda activate igvtools
-igvtools index /path/to/your/dbsnp.vcf
-conda deactivate                               # exit the igvtools environment
-conda activate scan2                           # reactivate the SCAN2 environment
-```

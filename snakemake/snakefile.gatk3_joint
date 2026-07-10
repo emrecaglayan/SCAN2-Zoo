@@ -7,7 +7,8 @@ rule make_arg_file:
     output:
         "gatk/gather_mmq{gatk_mmq}_args.list"
     resources:
-        mem=200
+        mem=200,
+	runtime=120
     shell:
         """
         for i in `seq 1 {config[gatk_chunks]}`; do
@@ -26,7 +27,8 @@ rule gatk_gather:
     output:
         vcf="gatk/hc_raw.mmq{gatk_mmq}.vcf"
     resources:
-        mem=4000
+        mem=4000,
+	runtime=120
     benchmark:
         "gatk/gather_benchmark.mmq{gatk_mmq}.tsv"
     shell:
@@ -50,7 +52,8 @@ rule gatk_scatter:
             "-L " + config['gatk_regions'][int(wildcards.gatk_chunk) - 1],
         mmq="{gatk_mmq}"
     resources:
-        mem=10000
+        mem=10000,
+	runtime=120
     benchmark:
         "gatk/scatter_benchmark.mmq{gatk_mmq}_chunk{gatk_chunk}.tsv"
     shell:

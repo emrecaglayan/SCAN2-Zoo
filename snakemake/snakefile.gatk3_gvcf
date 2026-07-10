@@ -13,7 +13,7 @@ rule gatk_gather:
             ' '.join([ "-I " + f for f in input ])
     resources:
         mem=4000,
-	runtime=90
+	runtime=120
     benchmark:
         "gatk/gather_benchmark.mmq{gatk_mmq}.tsv"
     shell:
@@ -33,7 +33,7 @@ rule gatk_genotypegvcfs:
         "gatk/genotypegvcfs_benchmark.mmq{gatk_mmq}_chunk{gatk_chunk}.tsv"
     resources:
         mem=8000,
-	runtime=90
+	runtime=120
     shell:
         "gatk3 -Xmx3500M -Xms3500M"
         "   -T GenotypeGVCFs"
@@ -53,7 +53,7 @@ rule gatk_combinegvcfs:
         "gatk/hc_raw.mmq{gatk_mmq}_chunk{gatk_chunk}.gvcf.gz"
     resources:
         mem=8000,
-	runtime=90
+	runtime=120
     benchmark:
         "gatk/combinegvcfs_benchmark.mmq{gatk_mmq}_chunk{gatk_chunk}.tsv"
     params:

@@ -12,7 +12,8 @@ rule gatk_gather:
         lambda wildcards, input:
             ' '.join([ "-I " + f for f in input ])
     resources:
-        mem=4000
+        mem=4000,
+	runtime=120
     benchmark:
         "gatk/gather_benchmark.mmq{gatk_mmq}.tsv"
     shell:
@@ -31,7 +32,8 @@ rule gatk_genotypegvcfs:
     benchmark:
         "gatk/genotypegvcfs_benchmark.mmq{gatk_mmq}_chunk{gatk_chunk}.tsv"
     resources:
-        mem=8000
+        mem=8000,
+	runtime=120
     shell:
         "gatk GenotypeGVCFs"
         "   --java-options '-Xmx4G -Xms4G'"
@@ -50,7 +52,8 @@ rule gatk_combinegvcfs:
     output:
         "gatk/hc_raw.mmq{gatk_mmq}_chunk{gatk_chunk}.gvcf.gz"
     resources:
-        mem=8000
+        mem=8000,
+	runtime=120
     benchmark:
         "gatk/combinegvcfs_benchmark.mmq{gatk_mmq}_chunk{gatk_chunk}.tsv"
     params:
@@ -74,7 +77,8 @@ rule gatk_scatter:
             "-L " + config['gatk_regions'][int(wildcards.gatk_chunk) - 1],
         mmq="{gatk_mmq}"
     resources:
-        mem=8000
+        mem=8000,
+	runtime=120
     benchmark:
         "gatk/{sample}/scatter_benchmark.mmq{gatk_mmq}_chunk{gatk_chunk}.tsv"
     shell:
