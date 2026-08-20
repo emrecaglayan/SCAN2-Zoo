@@ -31,20 +31,12 @@ package management tool and a Linux-flavored OS.
 ## Install SCAN2-Zoo
 Create a conda environment for SCAN2-Zoo and install necessary packages
 ```
-conda create -n scan2 -c conda-forge -c bioconda -c jluquette -c dranew -c soil scan2
+conda build -c conda-forge -c bioconda -c ecaglayan recipe/scan2-zoo
 
 # Once the environment is created, it must be activated every time
 # you wish to use SCAN2-Zoo.
 conda activate scan2-zoo
 ```
-
-
-
-### Internal R reference genome
-```
-conda install -c conda-forge -c bioconda bioconductor-bsgenome.hsapiens.ucsc.hg38
-```
-
 
 # Overview of SCAN2-Zoo
 SCAN2-Zoo runs in three steps; genotyping, panel building and refinement.
