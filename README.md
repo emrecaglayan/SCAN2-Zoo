@@ -25,7 +25,7 @@ if they are only interested in calling mutations from human cells:
 SCAN2-Zoo is freely available for non-commercial use.
 
 # Installation
-SCAN2 is distributed as a conda package. Installation requires the conda
+SCAN2-Zoo is distributed as a conda package. Installation requires the conda
 package management tool and a Linux-flavored OS.
 
 ## Install SCAN2-Zoo

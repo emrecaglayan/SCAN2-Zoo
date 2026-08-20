@@ -16,8 +16,15 @@ import pysam       # just for reading BAM headers to find samples
 import snakemake
 import distutils.util # for strtobool
 import csv
+import sys
 from sys import exit
 from pathlib import Path
+
+
+_CONDA_PREFIX = os.environ.get('CONDA_PREFIX', sys.prefix)
+_SNAKEFILE_DEFAULT = os.path.join(_CONDA_PREFIX, 'lib', 'scan2-zoo', 'Snakefile')
+_SCAN2_LIB_DIR = os.path.join(_CONDA_PREFIX, 'lib', 'scan2-zoo')
+
 
 
 # The default set must include ALL POSSIBLE parameters, even ones like BAM
@@ -73,7 +80,7 @@ scan2_param_defaults = {
     'gatk_regions': [],
     'chrs': [],
     'cross_sample_panel': None, # must be readable IF specified, but pipeline should run without it too
-    'scripts': None,  # also a directory
+    'scripts': _SCAN2_LIB_DIR,  # also a directory
     'chr_prefix': '',          # be nice to remove this; requires snakefile changes
     'bam_map': {},             # maps sample name -> bam path
     'permtool_config_map': {},
@@ -93,7 +100,7 @@ scan2_param_defaults = {
 # Unlike params, all files listed here must be readable upon a call
 # to validate() or run().
 scan2_file_defaults = {
-    'snakefile': '',
+    'snakefile': '_SNAKEFILE_DEFAULT',
     'ref': None,
     'bams': {},         # miscellaneous BAMs; not genotyped as single cells
     'sc_bams': {},      # BAMs for single cells, will be genotyped
@@ -779,15 +786,15 @@ def add_runtime_args(parser):
     return parser
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(prog='scan2',
+    ap = argparse.ArgumentParser(prog='scan2-zoo',
         description='Somatic SNV genotyper for whole genome amplified '
-                    'single cell sequencing experiments.',
+                    'single cell sequencing experiments in diploid organisms.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument('-d', '--analysis-dir', metavar='PATH', default='.',
         type=str,
         help='PATH containing the SCAN2 analysis. Required for all subcommands.')
     ap.add_argument('--snakefile', metavar='PATH', type=str,
-        default='',
+        default=_SNAKEFILE_DEFAULT,
         help='Path to the main Snakefile.  Unlikely to be necessary for standard use.')
     subparsers = ap.add_subparsers(dest='subcommand')
 
@@ -822,7 +829,7 @@ if __name__ == "__main__":
     config_parser.add_argument('--verbose', action='store_true', default=False,
         help='Print detailed list of all configuration changes.')
     config_parser.add_argument('--scripts', metavar='PATH',
-        default='',
+        default= _SCAN2_LIB_DIR,
         help='Path to SCAN2 script files.  Usually points to an installed '
             'set of files.')
     config_parser.add_argument('--gatk', default='gatk4_joint',
@@ -887,7 +894,7 @@ if __name__ == "__main__":
              'must ensure these match the supplied genome.  It is used '
              'when determining mutation signatures (e.g., to fetch '
              'trinucleotide contexts around candidate mutations).  Valid '
-             'values must match those recognized by the R SCAN2 package '
+             'values must match those recognized by the R SCAN2-Zoo package '
              '(see the genome.string.to.bsgenome.object function).')
     req.add_argument('--bsgenome', type=str,
         choices=[ 'BSgenome.Hsapiens.UCSC.hg19', 'BSgenome.Ptroglodytes.UCSC.panTro6', 'BSgenome.Mmulatta.UCSC.rheMac10', 'BSgenome.Cjacchus.UCSC.calJac4', 'BSgenome.Mmusculus.UCSC.mm39','BSgenome.Mfuro.UCSC.musFur1' ],
