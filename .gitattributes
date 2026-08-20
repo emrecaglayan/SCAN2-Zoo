@@ -1,0 +1,5 @@
+datasets/calJac4_homopolymers.bed filter=lfs diff=lfs merge=lfs -text
+datasets/merge_mmq60.tab.gz filter=lfs diff=lfs merge=lfs -text
+datasets/merge_mmq60.tab.gz.tbi filter=lfs diff=lfs merge=lfs -text
+datasets/panel_230.tab.gz filter=lfs diff=lfs merge=lfs -text
+datasets/panel_230.tab.gz.tbi filter=lfs diff=lfs merge=lfs -text
