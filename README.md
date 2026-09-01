@@ -87,8 +87,12 @@ intervals (for step 1). This can be increased for larger datasets (typically 100
 regions for the entire genome).
 
 ## Download the marmoset genome
+
+```
 wget https://hgdownload.soe.ucsc.edu/goldenPath/calJac4/bigZips/calJac4.fa.gz
 gunzip calJac4.fa.gz
+
+```
 
 # Run SCAN2-Zoo
 
