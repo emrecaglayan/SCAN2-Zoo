@@ -1,14 +1,8 @@
 #!/bin/bash
 
-#conda-build -c conda-forge -c bioconda -c jluquette -c dranew -c soil scan2
 
-
-#conda create -n build_env conda-build
-#conda activate build_env
-
-#conda install conda-build
-
-
+# Activate an environment where conda-build is installed.
+conda activate build_env
 conda build -c conda-forge -c bioconda -c ecaglayan recipe/scan2-zoo
 
 anaconda upload \

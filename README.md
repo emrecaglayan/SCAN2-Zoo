@@ -57,207 +57,171 @@ Refinement: Uses additional filters and panel information for final SNV and
 indel calls.
 
 # Minimal SCAN2-Zoo run
-SCAN2-Zoo relies on high converage (>15X) and a panel of cells from
+SCAN2-Zoo relies on high coverage (>10X) and a panel of cells from
 different subjects for accurate somatic SNV and indel calling. We
 provide a minimal example here for users to test whether the tool
 runs with the expected output files. Somatic mutation calls of this
-tutorial are not accurate. For a more detailed tutorial with
-explanations, please follow our vignette: XYZ
+tutorial are not final. All files are hosted in Zenodo:
 
-## Download the BAM files
+ZENODO LINK
+
+## The BAM files
 This is a glutamatergic neuron from a marmoset sample and its matched
-bulk WGS (aligned to calJac4). Both are subset to ~2X genomic coverage
-and limited to chromosome 20 for tutorial purposes.
+bulk WGS (aligned to calJac4). Both are either limited to chromosome 20 (for step 1) or
+subset to ~10X whole genome coverage (for step 3) for tutorial purposes.
 
-wget XYZ
-
-## Download the panel files
+## The panel files
 Since building a panel requires multiple samples, here we provide the
-pre-built panel files to enable full run of the third step for tutorial
-purposes.
+pre-built panel files of marmosets to enable full run for tutorial
+purposes. These files are subset to chr20 for step 1.
 
-wget XYZ
-
-## Download the homopolymer regions
+## The homopolymer regions
 Refinement step removes somatic mutation calls that map to homopolymers
-longer than 5 nucleotides. Here we provide this file for calJac4, please
-see the vignette for generating homopolymer regions from any genome.
+longer than 5 nucleotides. Here we provide this file for calJac4 chr20.
+Please see the vignette for generating homopolymer regions from any genome.
 
-wget XYZ
-
-## Generate a regions file
+## The regions file
 To parallelize genotyping with gatk, genome is split into a user defined
-number of regions. Here we will use calJac4 chromosome 20 split into 3
-intervals. This can be increased for larger datasets (typically 100-300
+number of regions. Here we will use calJac4 chromosome 20 split into 5
+intervals (for step 1). This can be increased for larger datasets (typically 100-300
 regions for the entire genome).
 
-wget XYZ
+## Download the marmoset genome
+wget https://hgdownload.soe.ucsc.edu/goldenPath/calJac4/bigZips/calJac4.fa.gz
+gunzip calJac4.fa.gz
 
 # Run SCAN2-Zoo
 
-## Genotyping
+## Step 1: Genotype
+
+
+```
+
+# Change to your work directory that has sufficient storage
+
+# Create a folder that for the outputs
+mkdir -p scan2_zoo_mini
+
+# Initialize SCAN2-Zoo for this run
+scan2-zoo \
+-d scan2_zoo_mini \
+init
+
+# Configure SCAN2-Zoo for this run
+scan2-zoo \
+-d scan2_zoo_mini \
+config \
+--gatk gatk3_gvcf \
+--bulk-bam datasets/bulk_230_chr20_subset.bam \
+--sc-bam datasets/sc_D10_230_chr20_subset.bam \
+--genome 'calJac4' \
+--ref /path/to/calJac4.fa \
+--regions-file datasets/calJac4_intervals_chr20.txt
+
+# Validate
+cd scan2_zoo_mini
+scan2-zoo validate
+
+# Run
+scan2-zoo run --joblimit 8
+
+
+```
+
+
+## Step 2: Build the cross-sample panel
+
+We will skip panel building for this example and use the prebuilt panel.
+Please refer to the detailed wiki for building a panel from multiple
+samples.
+
+
+## Step 3: Refine
+
+
+```
 
 scan2-zoo \
-  -d PTA_230 \
-  --snakefile ${SCAN2_dir}/snakemake/Snakefile \
-  config \
-  --gatk gatk4_gvcf \
-  --scripts ${SCAN2_dir}/scripts \
-  --bulk-bam ${BULK} \
-  --sc-bam ${SC1} \
-  --genome 'calJac4' \
-  --ref /home/ch253794/workdir/REFERENCES/BWA_REFERENCES/calJac4/calJac4.fa \
-  --regions-file /home/ch253794/workdir/REFERENCES/GenomicIntervals/calJac4_intervals.txt
+-d scan2_zoo_mini_refine \
+init
+
+# Add the scan2 object paths to a file. Normally this would be the files from step1 but
+# in this case we will not use it since it is not genomewide. We have uploaded
+# the genomewide calls under 'datasets' in Zenodo.
+
+realpath datasets/scan2_object.rda > scan2_zoo_mini_refine/scan2_objects.txt
+
+scan2-zoo \
+	-d scan2_zoo_mini_refine \
+	config \
+	--verbose \
+	--analysis refine \
+	--scan2-object-file scan2_zoo_mini_refine/scan2_objects.txt \
+	--indel-fraction-delta 0.5 \
+	--genome 'calJac4' \
+	--bsgenome 'BSgenome.Cjacchus.UCSC.calJac4' \
+	--ref /path/to/calJac4.fa \
+	--makepanel-metadata datasets/panel_marmoset.csv \
+	--panel datasets/merge_mmq60.tab.gz \
+	--homopolymers datasets/calJac4_homopolymers.bed \
+	--filter-homopolymers \
+	--target-fdr 0.01 \
+	--panel-stats datasets/panel_230_panel.tab.gz \
+	--bulk-bam datasets/bulk_230_subset.bam
 
 
+cd scan2_zoo_mini_refine
+scan2-zoo refine --snakemake-args "--configfile scan.yaml --config config_path=scan.yaml"
 
-## Run SCAN2
-Replace instances of /path/to/... with the paths
-downloaded above. This demo runs in ~15 minutes on a 20 core
-machine by restricting analysis to a 2 MB segment of chr22.
+
 ```
-# Creates a directory for the analysis
-scan2 -d demo init
-cd demo
 
-# Configure analysis parameters. Can be run multiple times to change
-# parameters.
-scan2 config \
-    --verbose \
-    --ref /path/to/human_g1k_v37_decoy.fasta \
-    --dbsnp /path/to/dbsnp_138_b37.vcf \
-    --shapeit-refpanel  /path/to/1000GP_Phase3 \
-    --regions 22:30000000-30999999,22:31000000-31999999 \
-    --bulk-bam /path/to/hunamp.chr22.bam \
-    --sc-bam /path/to/il-11.chr22.bam 
-    --sc-bam /path/to/il-12.chr22.bam 
 
-# Attempts to validate the chosen parameters and input files. Not
-# exhaustive, but helpful to prevent errors.
-scan2 validate
+## Examine results
 
-# Run the analysis. Set the number of cores you wish you use; for
-# more advanced parallelization on a cluster or the cloud, see the
-# sections below.
-scan2 run --joblimit <N cores>
-```
-See `scan2 -h` for more details on configuration options and runtime arguments.
+Final step of SCAN2-Zoo creates a file that has the mutation burden, mutations that pass
+the filters and mutations that failed the final filters (in the 'refine' step) and which
+filter they failed. SCAN2-Zoo also creates a SCAN2 object that contains statistics
+for every variant in addition to many other details (scan2_object_refine.rda).
+Here we will load the final mutation calls and mutation burden estimates as well as the
+final SCAN2 object.
 
-After SCAN2 completes, single sample results are stored in 
-Rdata format `demo/call_mutations/[single_cell_sample_name]/scan2_object.rda`.
+Run R and load the output files as indicated below. Make sure to use the R installation
+in the SCAN2-Zoo conda environment for the SCAN2-Zoo R library.
 
-Run R and load the RData file. IMPORTANT! Use the R installation in the SCAN2 conda
-environment for the SCAN2 R library.
 ```
 $ R   
-R> library(scan2)
-# The two single cell samples are 'h24' (il-11) and 'h25' (il-12)
-R> load('demo/call_mutations/h25/scan2_object.rda')
-```
+R> library(scan2.zoo)
+R> res = readRDS('objects/230-D10/230-D10_final_burdens_and_calls.rds')
+R> names(res)
 
-We now provide an S4 class called 'SCAN2' that handles both the
-genotyping logic and allows convenient user interaction. Each
-single cell in a SCAN2 run will have a 'results' object saved in the
-corresponding scan2_object.rda file.
+R> # Get genomewide burden estimates
+R> burden = res[['Burden']]
+R> # The most accurate burden estimate is the second quantile (Q2) that
+R> # corresponds to somatic calls sequenced at normal depth (between 25th and 75th percentile).
+R> snv_burden = burden[burden$muttype == 'snv' & burden$quantile == 'Q2', 'burden']
+R> print(snv_burden)
+R> indel_burden = burden[burden$muttype == 'indel' & burden$quantile == 'Q2', 'burden']
+R> print(indel_burden)
+
+R> # Examine the final mutation calls
+R> head(res[['Passes_snv']])
+R> head(res[['Passes_indel']])
+
+R> # The mutations filtered in the last 'refine' step can also be examined.
+R> # column 'reason' indicates why it is filtered
+R> head(res[['Filtered_snv']])
+R> head(res[['Passes_indel']])
+
+R> # Load the final SCAN2 object if you would like to check statistics on all
+R> # variants called by GATK.
+R> obj = get(load('objects/230-D10/230-D10_scan2_object_refine.rda'))
+R> head(obj@gatk)
 
 
-The S4 class provides a summary of several features of the data.
-```
-R> results
-# SCAN2 
-#   Region:
-GRanges object with 22 ranges and 0 metadata columns:
-       seqnames      ranges strand
-          <Rle>   <IRanges>  <Rle>
-   [1]        1 1-249250621      *
-   [2]        2 1-243199373      *
-   [3]        3 1-198022430      *
-   [4]        4 1-191154276      *
-   [5]        5 1-180915260      *
-   ...      ...         ...    ...
-  [18]       18  1-78077248      *
-  [19]       19  1-59128983      *
-  [20]       20  1-63025520      *
-  [21]       21  1-48129895      *
-  [22]       22  1-51304566      *
-  -------
-  seqinfo: 22 sequences from GRCh37.p13 genome
-#   Genome: hs37d5 
-#   Single cell ID: h25 
-#   Bulk ID: hunamp 
-#   GATK: 2517 raw sites
-#   AB model training hSNPs: 753 phasing: 0|1=411, 1|0=342
-#       VAF correlation between neighboring hSNPs:
-#           <10 bp 1 <100 bp 0.983 <1000 bp 0.897 <10 kbp 0.806 <100 kbp 0.203 
-#         36 resampled hSNPs
-#         7 resampled hIndels
-#   AB model parameters:
-#       average (over chromosomes): a=-2.374, b=669.314, c=1.125, d=10193.908
-#   Allele balance:
-#       mean (0 is neutral): -0.073 
-#       uncertainty (Q25, median, Q75): 0.372 0.558 1.162 
-#       mean at training hSNPs: 0.058 
-#   Mutation models: computed
-#   CIGAR data: single cell: 2517 sites, bulk: 2517 sites
-#   Static filters: 
-#          snv:       12 retained     1873 removed        0 NA
-#        indel:        7 retained      625 removed        0 NA
-#   FDR prior data: 
-#          snv:       25 candidates      657 germline hets        4 max burden
-#        indel:       13 candidates      108 germline hets        0 max burden
-#   Depth profile: 
-#          snv: genome <:   min. bulk DP 1.3%,   min. sc DP 8.6%,   either 9.4%
-#        indel: genome <:   min. bulk DP 1.3%,   min. sc DP 15.4%,   either 15.9%
-#   Somatic mutation calls: mode=new, target.fdr=0.010
-#          snv:        0 called       11 resampled training calls
-#        indel:        0 called        1 resampled training calls
-#       ALL indel calls have been suppressed (insufficient number of single cells in cross-sample filter
-#   Somatic mutation burden: 
-#          snv:     NA somatic,   NA% sens,   NA callable Gbp,   NA muts/haploid Gbp,   NA muts per genome
-#        indel:     NA somatic,   NA% sens,   NA callable Gbp,   NA muts/haploid Gbp,   NA muts per genome
-#       indel mutation burden estimates ARE NOT VALID (cross-sample panel insufficiency)!
-#   Mutation rescue by signature: (not computed)
-```
-
-This SCAN2 object contains only VAF-based somatic mutation calls. For
-signature-based rescue, see `scan2 rescue -h`. Further, this SCAN2 object
-will not contain indel calls because no cross sample filter was provided
-(see `scan2 config --help`, `--cross-sample-panel`).
-
-There should be no called somatic SNVs in this demo dataset.
-```
-R> snvs <- results@gatk[pass == TRUE & muttype == 'snv']
-R> snvs
-Empty data.table (0 rows and 73 cols): chr,pos,dbsnp,refnt,altnt,mq...
 ```
 
 
-# Parallelization
-In a practical setting, parallelization will be required. SCAN2 leverages
-Snakemake to offer parallelization via any of the following:
-* A single machine with multiple cores. To do this, increase the
-  `--joblimit` parameter but do not invoke cluster or cloud
-  arguments.  A total memory limit can also be set via
-  `--memlimit`, which should be supplied in megabytes.
-* Clusters with distributed resource management software (e.g., SLURM,
-  LSF, GridEngine). If your resource management software supports
-  DRMAA (https://www.drmaa.org), the authors recommend using the
-  `--drmaa`. **However, additional libraries may be necessary to
-  interface with the DRMAA wrapper.**
-    * E.g., in the SCAN2 publication, a SLURM cluster was accessed via
-      the slurm-drmaa 1.1.1 package (https://github.com/natefoo/slurm-drmaa). This
-      package was maintained by local cluster system admins.
-      An example command line for running SCAN2 with DRMAA follows. Note the `--mem`
-      argument, which uses Snakemake's `{resources.mem}` placeholder to allow each
-      individual job in the SCAN2 pipeline to specify the amount of memory needed and
-      the `{threads}` placeholder.
-        ```
-        scan2 run --joblimit 100 --drmaa ' -p YOUR_QUEUE_NAME -A YOUR_ACCOUNT -t 10:00 -c {threads} --mem={resources.mem}'
-        ```
-    * If your scheduler is not DRMAA-compatible (or if the appropriate
-      DRMAA interface is unavailable), Snakemake's `--cluster` option
-      offers similar functionality to `--drmaa`, but with fewer features.
-* Cloud environments.
 
-See Snakemake's documentation for more details on cluster and cloud execution: https://snakemake.readthedocs.io/en/stable/.
+
 
